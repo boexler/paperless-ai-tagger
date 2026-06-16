@@ -11,6 +11,53 @@ logger = logging.getLogger(__name__)
 LOG_TRUNCATE_LENGTH = 500
 
 
+class _AgentStreamLogBuffer:
+    """Accumulates token-level agent stream chunks into readable log lines."""
+
+    def __init__(self, document_id: int, max_line_length: int = LOG_TRUNCATE_LENGTH) -> None:
+        self.document_id = document_id
+        self.max_line_length = max_line_length
+        self._buffers: dict[str, str] = {"assistant": "", "thinking": ""}
+        self._last_msg_type: str | None = None
+
+    def append(self, msg_type: str, text: str) -> None:
+        """Append a stream chunk, flushing on message-type changes."""
+        if msg_type not in self._buffers or not text:
+            return
+        if self._last_msg_type and self._last_msg_type != msg_type:
+            self.flush(self._last_msg_type)
+        self._last_msg_type = msg_type
+        self._append_to_buffer(msg_type, text)
+
+    def _append_to_buffer(self, kind: str, text: str) -> None:
+        """Append text and emit 500-char blocks when the buffer exceeds the limit."""
+        buffer = self._buffers[kind] + text
+        while len(buffer) >= self.max_line_length:
+            self._emit(kind, buffer[: self.max_line_length])
+            buffer = buffer[self.max_line_length :]
+        self._buffers[kind] = buffer
+
+    def flush(self, kind: str | None = None) -> None:
+        """Emit buffered text for one kind or for all kinds when kind is None."""
+        kinds = [kind] if kind else list(self._buffers.keys())
+        for buffer_kind in kinds:
+            text = self._buffers[buffer_kind].strip()
+            if text:
+                self._emit(buffer_kind, text)
+            self._buffers[buffer_kind] = ""
+
+    def flush_all(self) -> None:
+        """Emit all remaining buffered assistant and thinking text."""
+        self.flush(None)
+
+    def _emit(self, kind: str, text: str) -> None:
+        """Write one consolidated log line for assistant or thinking output."""
+        if kind == "assistant":
+            logger.info("Agent assistant (document %s): %s", self.document_id, text)
+        elif kind == "thinking":
+            logger.info("Agent thinking (document %s): %s", self.document_id, text)
+
+
 @dataclass
 class TaggingResult:
     document_id: int
@@ -72,7 +119,12 @@ class DocumentTagger:
             return text
         return f"{text[:LOG_TRUNCATE_LENGTH]}..."
 
-    def _log_agent_message(self, document_id: int, message: object) -> str | None:
+    def _log_agent_message(
+        self,
+        document_id: int,
+        message: object,
+        stream_buffer: _AgentStreamLogBuffer,
+    ) -> str | None:
         """Log agent stream messages and return a tool error summary when present."""
         msg_type = getattr(message, "type", None)
 
@@ -80,24 +132,19 @@ class DocumentTagger:
             content = getattr(getattr(message, "message", None), "content", None) or []
             for block in content:
                 if getattr(block, "type", None) == "text":
-                    text = getattr(block, "text", "").strip()
-                    if text:
-                        logger.info("Agent assistant (document %s): %s", document_id, text)
+                    stream_buffer.append("assistant", getattr(block, "text", ""))
             return None
 
         if msg_type == "thinking":
-            text = getattr(message, "text", "").strip()
-            if text:
-                logger.info(
-                    "Agent thinking (document %s): %s",
-                    document_id,
-                    self._truncate_for_log(text),
-                )
+            stream_buffer.append("thinking", getattr(message, "text", ""))
             return None
 
         if msg_type == "tool_call":
+            stream_buffer.flush_all()
             name = getattr(message, "name", "?")
             status = getattr(message, "status", "?")
+            if status not in ("completed", "error"):
+                return None
             args = self._truncate_for_log(getattr(message, "args", ""))
             result = self._truncate_for_log(getattr(message, "result", ""))
             logger.info(
@@ -113,6 +160,7 @@ class DocumentTagger:
             return None
 
         if msg_type == "status":
+            stream_buffer.flush_all()
             status_text = getattr(message, "message", None) or getattr(message, "status", "")
             if status_text:
                 logger.info("Agent status (document %s): %s", document_id, status_text)
@@ -123,13 +171,17 @@ class DocumentTagger:
     def _run_agent_with_logging(self, document_id: int, prompt: str):
         """Run the Cursor agent and log assistant output, thinking, and tool calls."""
         tool_errors: list[str] = []
+        stream_buffer = _AgentStreamLogBuffer(document_id)
 
         with Agent.create(self._build_agent_options()) as agent:
             run = agent.send(prompt)
-            for message in run.messages():
-                tool_error = self._log_agent_message(document_id, message)
-                if tool_error:
-                    tool_errors.append(tool_error)
+            try:
+                for message in run.messages():
+                    tool_error = self._log_agent_message(document_id, message, stream_buffer)
+                    if tool_error:
+                        tool_errors.append(tool_error)
+            finally:
+                stream_buffer.flush_all()
             result = run.wait()
 
         return result, tool_errors
