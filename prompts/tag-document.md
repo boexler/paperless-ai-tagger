@@ -99,6 +99,69 @@ Berücksichtige dabei:
 * Tags beschreiben Themen, Kontexte, Status oder Aktionen.
 * Der Korrespondent ist nicht automatisch ein Tag, außer es gibt dafür bereits bewusst ein passendes Tag.
 
+### 4a. Titel prüfen und ggf. verbessern
+
+Prüfe den vorhandenen Titel des Dokuments.
+
+Der Titel soll kurz, verständlich und ohne Öffnen des Dokuments aussagekräftig sein.
+
+Ein guter Titel beschreibt:
+
+* die Art des Dokuments
+* den konkreten Inhalt oder Vorgang
+* optional einen relevanten Zeitraum, Vertrag, Gegenstand oder Zweck
+
+Bevorzugtes Schema:
+
+`[Dokumenttyp] – [konkreter Inhalt / Kontext]`
+
+Beispiele:
+
+* `Rechnung – Stromabschlag Januar 2026`
+* `Vertrag – Mobilfunk Vodafone`
+* `Bescheid – Einkommensteuer 2025`
+* `Kontoauszug – Girokonto Mai 2026`
+* `Schreiben – Beitragserhöhung Hausratversicherung`
+* `Nachweis – Zahlung Kfz-Versicherung`
+* `Mahnung – Offene Rechnung Internetanschluss`
+
+Verwende keinen schlechten oder technischen Titel wie:
+
+* `scan_2026_06_16.pdf`
+* `document.pdf`
+* `IMG_1234`
+* `Rechnung`
+* `Brief`
+* `Unbekannt`
+* ausschließlich den Korrespondenten, z. B. `Telekom`
+
+Wenn der vorhandene Titel bereits aussagekräftig ist, lasse ihn unverändert.
+
+Wenn der Titel generisch, technisch oder wenig aussagekräftig ist und du aus OCR-Text, Korrespondent und Dokumenttyp sicher einen besseren Titel ableiten kannst, aktualisiere den Titel mit `document_update`.
+
+Beispiele für generische Titel, die verbessert werden sollen:
+
+* `Rechnung` → `Rechnung – Stromabschlag Januar 2026`
+* `Scan` → `Bescheid – Einkommensteuer 2025`
+* `Telekom` → `Rechnung – Mobilfunk Telekom`
+* `Dokument` → `Vertrag – Hausratversicherung`
+
+Ändere den Titel nur, wenn du dir sicher bist.
+
+Wenn kein eindeutiger Titel ableitbar ist:
+
+* vorhandenen Titel nicht spekulativ ändern
+* `needs-review` setzen
+* Begründung in der Notiz nennen
+
+Wenn du den Titel aktualisierst, übergib bei `document_update` zusätzlich zum vollständigen `tags`-Array auch das Titelfeld, sofern das Tool dieses Feld unterstützt.
+
+Wichtig:
+
+* Bei `document_update` dürfen bestehende Tags nicht verloren gehen.
+* Wenn du den Titel änderst, muss das vollständige Tag-Array trotzdem mitgegeben werden.
+* Keine Metadatenänderung darf dazu führen, dass vorhandene Tags entfernt werden.
+
 ### 5. Passende Tags auswählen
 
 Wähle Tags primär aus der bestehenden Tag-Liste.
@@ -212,7 +275,7 @@ Wenn der vorhandene Dokumenttyp fachlich plausibel ist, lasse ihn unverändert.
 
 Wenn der vorhandene Korrespondent fachlich plausibel ist, lasse ihn unverändert.
 
-### 10. Tags am Dokument aktualisieren
+### 10. Dokument aktualisieren
 
 Erstelle die finale Tag-Liste aus:
 
@@ -224,48 +287,79 @@ Erstelle die finale Tag-Liste aus:
 
 Entferne keine bestehenden Tags.
 
+Wenn der Titel sicher verbessert werden kann, aktualisiere zusätzlich den Titel.
+
 Rufe anschließend `document_update` auf.
 
 Parameter:
 
 * `id={{document_id}}`
 * `tags` als JSON-Array aller numerischen Tag-IDs
+* optional `title`, wenn der Titel sicher verbessert werden soll und das Tool dieses Feld unterstützt
 
-Beispiel:
+Beispiel nur mit Tags:
 
 `tags="[1,12,34,56]"`
+
+Beispiel mit Tags und Titel:
+
+`tags="[1,12,34,56]", title="Rechnung – Stromabschlag Januar 2026"`
 
 Wichtig:
 
 * `tags` ersetzt die komplette Tag-Liste des Dokuments.
 * Deshalb müssen bestehende Tags zwingend wieder mitgegeben werden.
 * Verwende numerische Tag-IDs, nicht Tag-Namen.
+* Ändere den Titel nur bei hoher Sicherheit.
 
 ### 11. Notiz hinzufügen
 
-Hänge mit `document_note_add` eine kurze deutsche Notiz an.
+Hänge mit `document_note_add` eine kurze deutsche Notiz an das Dokument an.
 
 Parameter:
 
 * `id={{document_id}}`
 * `note="..."`
 
+Die Notiz soll die automatische Entscheidung nachvollziehbar dokumentieren. Sie soll kurz, sachlich und prüfbar sein.
+
 Die Notiz muss enthalten:
 
+* ob der Titel geändert wurde
+* falls der Titel geändert wurde: alter und neuer Titel
+* falls der Titel nicht geändert wurde: kurze Einschätzung, ob der vorhandene Titel plausibel war
 * gesetzte oder ergänzte Tags
-* kurze Begründung
+* kurze Begründung für die Tag-Auswahl
+* ob `ai-tagged` gesetzt wurde
 * ob `needs-review` gesetzt wurde
 * falls `needs-review` gesetzt wurde: konkrete Gründe
 * falls neue Tags angelegt wurden: Name und Begründung
 * falls keine neuen Tags angelegt wurden: Hinweis, dass vorhandene Tags bevorzugt wurden
+* falls Korrespondent oder Dokumenttyp unklar wirken: Hinweis darauf
+* falls ein Handlungsbedarf erkennbar ist: Hinweis auf gesetztes Status- oder Aufgaben-Tag
+* falls ein Handlungsbedarf vermutet, aber nicht sicher erkannt wird: `needs-review` setzen und Grund nennen
 
-Beispiel für eine Notiz:
+Wenn kein Review nötig ist, muss die Notiz klar sagen, warum `needs-review` nicht gesetzt wurde.
 
-`Automatische Einordnung: Tags ergänzt: Finanzen, Wohnen, Strom, ai-tagged. Begründung: Das Dokument wirkt wie eine Stromrechnung für die Wohnung. needs-review wurde nicht gesetzt, da Titel, Korrespondent, Dokumenttyp und OCR-Inhalt plausibel sind.`
+Wenn Review nötig ist, muss die Notiz klar sagen, was ein Mensch prüfen soll.
 
-Beispiel bei Unsicherheit:
+Bevorzugtes Format der Notiz:
 
-`Automatische Einordnung: Tags ergänzt: Versicherung, Auto, ai-tagged, needs-review. Begründung: Das Dokument betrifft vermutlich eine KFZ-Versicherung. needs-review wurde gesetzt, weil der Dokumenttyp unklar ist und geprüft werden sollte, ob zusätzlich ein Status-Tag oder ein Aufbewahrungshinweis nötig ist.`
+`Automatische Einordnung: [Titelbewertung]. Tags ergänzt: [Tag-Liste]. Begründung: [kurze Begründung]. ai-tagged wurde gesetzt. needs-review wurde [gesetzt/nicht gesetzt]: [Grund]. [Neue Tags / keine neuen Tags].`
+
+Kompakte Beispiele:
+
+`Automatische Einordnung: Titel plausibel, nicht geändert. Tags ergänzt: Finanzen, Wohnen, Strom, ai-tagged. Begründung: Stromrechnung für Wohnung erkennbar. needs-review wurde nicht gesetzt: Metadaten und OCR-Inhalt sind plausibel. Keine neuen Tags angelegt.`
+
+`Automatische Einordnung: Titel geändert von "Scan" zu "Rechnung – Stromabschlag Januar 2026". Tags ergänzt: Finanzen, Wohnen, Strom, ai-tagged. Begründung: Rechnung und Zeitraum eindeutig erkennbar. needs-review wurde nicht gesetzt: Einordnung eindeutig. Keine neuen Tags angelegt.`
+
+`Automatische Einordnung: Titel nicht geändert, da kein eindeutigerer Titel sicher ableitbar war. Tags ergänzt: Versicherung, Auto, ai-tagged, needs-review. Begründung: Vermutlich KFZ-Versicherung, Dokumenttyp unklar. needs-review wurde gesetzt: Mensch soll Dokumenttyp und Titel prüfen. Keine neuen Tags angelegt.`
+
+`Automatische Einordnung: Titel geändert von "Dokument" zu "Bescheid – Pflegeversicherung". Tags ergänzt: Versicherung, Gesundheit, ai-tagged, needs-review. Begründung: Pflegeversicherung erkennbar, aber kein spezifisches vorhandenes Tag gefunden. needs-review wurde gesetzt: neues Tag "Pflegeversicherung" prüfen. Keine neuen Tags angelegt.`
+
+`Automatische Einordnung: Titel plausibel, nicht geändert. Tags ergänzt: Finanzen, Internet, offen, frist, ai-tagged, needs-review. Begründung: Mahnung mit Zahlungsaufforderung und Frist. needs-review wurde gesetzt: Frist und Zahlungsstatus prüfen. Keine neuen Tags angelegt.`
+
+`Automatische Einordnung: Titel geändert von "Scan" zu "Nachweis – Photovoltaik Einspeisevergütung". Tags ergänzt: Energie, Photovoltaik, ai-tagged, needs-review. Begründung: Photovoltaik-Bezug eindeutig, kein passendes spezifisches Tag vorhanden. needs-review wurde gesetzt: neues Tag und Taxonomie prüfen. Neues Tag angelegt: Photovoltaik.`
 
 ## Entscheidungsregeln
 
