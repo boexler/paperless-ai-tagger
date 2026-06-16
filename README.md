@@ -203,11 +203,13 @@ Die Datei `prompts/tag-document.md` wird als Template geladen. Verfügbare Platz
 | `{{document_type}}` | Webhook-Payload |
 | `{{doc_url}}` | Webhook-Payload |
 
-Nach Änderungen am Prompt Container neu starten:
+Der Prompt wird beim Image-Build ins Container-Image kopiert. Nach Änderungen am Prompt Image neu bauen:
 
 ```bash
-docker compose restart webhook-receiver
+docker compose up -d --build webhook-receiver
 ```
+
+In Portainer: Stack **Pull and redeploy** (mit Rebuild).
 
 ## Wichtige Hinweise
 

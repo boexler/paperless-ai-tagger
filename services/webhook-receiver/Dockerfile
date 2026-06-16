@@ -6,10 +6,11 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY services/webhook-receiver/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
+COPY services/webhook-receiver/app ./app
+COPY prompts ./prompts
 
 ENV PYTHONUNBUFFERED=1
 ENV DATA_DIR=/data

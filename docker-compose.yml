@@ -11,7 +11,8 @@ services:
 
   webhook-receiver:
     build:
-      context: ./services/webhook-receiver
+      context: .
+      dockerfile: services/webhook-receiver/Dockerfile
     restart: unless-stopped
     environment:
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
@@ -22,7 +23,6 @@ services:
       DEDUP_TTL_HOURS: ${DEDUP_TTL_HOURS:-24}
       PROMPT_TEMPLATE_PATH: /app/prompts/tag-document.md
     volumes:
-      - ./prompts:/app/prompts:ro
       - webhook-data:/data
     ports:
       - "${WEBHOOK_PORT:-8080}:8080"
