@@ -7,7 +7,7 @@ WORKDIR /app
 COPY --from=paperless-mcp /paperless-ngx-mcp /usr/local/bin/paperless-ngx-mcp
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl nano \
     && rm -rf /var/lib/apt/lists/*
 
 COPY services/webhook-receiver/requirements.txt .

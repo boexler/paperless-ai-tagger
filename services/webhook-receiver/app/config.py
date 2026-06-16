@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     )
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     dedup_ttl_hours: int = Field(default=24, validation_alias="DEDUP_TTL_HOURS")
+    max_concurrent_jobs: int = Field(default=1, validation_alias="MAX_CONCURRENT_JOBS")
     data_dir: str = Field(default="/data", validation_alias="DATA_DIR")
     agent_cwd: str = Field(default="/app", validation_alias="AGENT_CWD")
 

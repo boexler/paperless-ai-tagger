@@ -2,11 +2,12 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from app.config import Settings, settings
 from app.dedup import ProcessedDocumentStore
+from app.job_queue import TaggingJobQueue
 from app.models import WebhookPayload, extract_document_id
 from app.tagger import DocumentTagger, TaggingResult
 
@@ -28,12 +29,18 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.store = create_store(settings)
     app.state.tagger = DocumentTagger(settings)
+    job_queue = TaggingJobQueue(settings.max_concurrent_jobs)
+    job_queue.bind(app.state.tagger, app.state.store, run_tagging_job)
+    await job_queue.start()
+    app.state.job_queue = job_queue
     logger.info(
-        "Webhook receiver started (prompt: %s, path: %s)",
+        "Webhook receiver started (prompt: %s, path: %s, max_concurrent_jobs: %s)",
         settings.prompt_template,
         settings.prompt_template_path,
+        settings.max_concurrent_jobs,
     )
     yield
+    await job_queue.stop()
     logger.info("Webhook receiver stopped")
 
 
@@ -71,14 +78,18 @@ def run_tagging_job(
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health(request: Request) -> dict[str, str | int]:
+    job_queue: TaggingJobQueue = request.app.state.job_queue
+    return {
+        "status": "ok",
+        "pending_jobs": job_queue.pending_count,
+        "queued_jobs": job_queue.queued_count(),
+    }
 
 
 @app.post("/webhook")
 async def webhook(
     request: Request,
-    background_tasks: BackgroundTasks,
     secret: str | None = Query(default=None),
 ) -> JSONResponse:
     verify_secret(request, secret)
@@ -108,10 +119,19 @@ async def webhook(
             },
         )
 
-    tagger: DocumentTagger = request.app.state.tagger
-    background_tasks.add_task(run_tagging_job, tagger, store, document_id, payload)
+    job_queue: TaggingJobQueue = request.app.state.job_queue
+    enqueued = await job_queue.submit(document_id, payload)
+    if not enqueued:
+        logger.info("Skipping document %s (already queued or running)", document_id)
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status": "skipped",
+                "document_id": document_id,
+                "reason": "already_queued",
+            },
+        )
 
-    logger.info("Queued tagging job for document %s", document_id)
     return JSONResponse(
         status_code=202,
         content={

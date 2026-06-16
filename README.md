@@ -179,6 +179,7 @@ paperless-ai-tagger/
 │       ├── requirements.txt
 │       └── app/
 │           ├── main.py         # Webhook-Endpunkte
+│           ├── job_queue.py    # Begrenzte Job-Warteschlange
 │           ├── tagger.py       # Cursor SDK Integration
 │           ├── config.py       # Umgebungsvariablen
 │           ├── models.py       # Payload-Modelle
@@ -249,7 +250,7 @@ uvicorn app.main:app --reload --port 8080
 
 | Methode | Pfad | Beschreibung |
 |---|---|---|
-| `GET` | `/health` | Healthcheck |
+| `GET` | `/health` | Healthcheck inkl. `pending_jobs` und `queued_jobs` |
 | `POST` | `/webhook` | Asynchron – antwortet sofort mit `202`, Tagging im Hintergrund |
 | `POST` | `/webhook/sync` | Synchron – wartet auf Agent-Ergebnis (nur für Tests) |
 
@@ -286,6 +287,16 @@ In Portainer: Stack **Pull and redeploy** (mit Rebuild).
 - **Workflow 1** nur auf **„Document Added“** triggern, nicht auf „Document Updated“.
 - **Workflow 2** bewusst auf **„Document Updated“** mit Filter `ai-tag-document` und ohne `ai-tag-tax` — so startet die Steuerprüfung erst nach abgeschlossener Klassifikation.
 - Workflow 2 setzt `ai-tag-tax` und löst damit keine erneute Steuerprüfung aus.
+
+### Job-Warteschlange
+
+Eingehende Webhooks werden nicht parallel unbegrenzt gestartet. Jede Instanz verarbeitet Jobs über eine interne Queue mit `MAX_CONCURRENT_JOBS` (Standard: `1` = strikt nacheinander).
+
+- Bulk-Import (z. B. Postfach mit vielen Dokumenten): Paperless feuert viele Webhooks, der Receiver antwortet jeweils mit `202` und arbeitet die Jobs kontrolliert ab.
+- Doppelte Webhooks für dieselbe Dokument-ID während ein Job läuft oder wartet: Antwort `skipped` mit `reason: already_queued`.
+- `/health` zeigt `pending_jobs` (wartend + laufend) und `queued_jobs` (nur wartend).
+
+Die Queue liegt im Arbeitsspeicher — bei Container-Neustart gehen noch nicht verarbeitete Jobs verloren. Bereits abgeschlossene Jobs bleiben über Dedup geschützt.
 
 ### Deduplizierung
 
@@ -341,6 +352,7 @@ Paperless sendet Webhook an `http://<server-ip>:8080/webhook?secret=...`.
 | `PROMPT_TEMPLATE_PATH` | nein | Voller Pfad zum Prompt (überschreibt `PROMPT_TEMPLATE`) |
 | `PAPERLESS_MCP_COMMAND` | nein | Pfad zum MCP-Binary (Standard: `/usr/local/bin/paperless-ngx-mcp`) |
 | `DEDUP_TTL_HOURS` | nein | Deduplizierungs-Fenster (Standard: `24`) |
+| `MAX_CONCURRENT_JOBS` | nein | Parallele Tagging-Jobs pro Instanz (Standard: `1`) |
 | `LOG_LEVEL` | nein | Log-Level (Standard: `INFO`) |
 
 ## Troubleshooting
