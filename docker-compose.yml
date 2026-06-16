@@ -1,28 +1,46 @@
+x-webhook-receiver: &webhook-receiver-base
+  build:
+    context: .
+    dockerfile: services/webhook-receiver/Dockerfile
+  restart: unless-stopped
+  environment: &webhook-receiver-env
+    WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+    CURSOR_API_KEY: ${CURSOR_API_KEY}
+    CURSOR_MODEL: ${CURSOR_MODEL:-composer-2.5}
+    PAPERLESS_BASE_URL: ${PAPERLESS_BASE_URL}
+    PAPERLESS_API_TOKEN: ${PAPERLESS_API_TOKEN}
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    DEDUP_TTL_HOURS: ${DEDUP_TTL_HOURS:-24}
+  networks:
+    - paperless-ai-tagger
+
 services:
-  webhook-receiver:
-    build:
-      context: .
-      dockerfile: services/webhook-receiver/Dockerfile
-    restart: unless-stopped
+  webhook-receiver-tag-document:
+    <<: *webhook-receiver-base
+    container_name: paperless-ai-tagger-tag-document.md
     environment:
-      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
-      CURSOR_API_KEY: ${CURSOR_API_KEY}
-      CURSOR_MODEL: ${CURSOR_MODEL:-composer-2.5}
-      PAPERLESS_BASE_URL: ${PAPERLESS_BASE_URL}
-      PAPERLESS_API_TOKEN: ${PAPERLESS_API_TOKEN}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      DEDUP_TTL_HOURS: ${DEDUP_TTL_HOURS:-24}
-      PROMPT_TEMPLATE_PATH: /app/prompts/tag-document.md
+      <<: *webhook-receiver-env
+      PROMPT_TEMPLATE: tag-document.md
     volumes:
-      - webhook-data:/data
+      - webhook-data-tag-document:/data
     ports:
-      - "${WEBHOOK_PORT:-8080}:8080"
-    networks:
-      - paperless-ai-tagger
+      - "${WEBHOOK_PORT_DOCUMENT:-8080}:8080"
+
+  webhook-receiver-tag-tax:
+    <<: *webhook-receiver-base
+    container_name: paperless-ai-tagger-tag-tax.md
+    environment:
+      <<: *webhook-receiver-env
+      PROMPT_TEMPLATE: tag-tax.md
+    volumes:
+      - webhook-data-tag-tax:/data
+    ports:
+      - "${WEBHOOK_PORT_TAX:-8081}:8080"
 
 networks:
   paperless-ai-tagger:
     driver: bridge
 
 volumes:
-  webhook-data:
+  webhook-data-tag-document:
+  webhook-data-tag-tax:

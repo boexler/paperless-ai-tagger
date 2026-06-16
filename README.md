@@ -18,8 +18,29 @@ flowchart LR
 |---|---|
 | **Paperless-ngx** | Dokumentenverwaltung, feuert Webhook bei „Document Added“ |
 | **paperless-ngx-mcp** | MCP-Server (stdio) mit Zugriff auf die Paperless-API, im webhook-receiver-Image enthalten |
-| **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK |
-| **prompts/tag-document.md** | Fest definierter Prompt für das Tagging |
+| **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK (zwei Instanzen in der Pipeline) |
+| **prompts/tag-document.md** | Prompt für die allgemeine Klassifikation (setzt `ai-tagged`) |
+| **prompts/tag-tax.md** | Prompt für die nachgelagerte Steuerprüfung (setzt `ai-tax-reviewed`) |
+
+## Zweistufige Pipeline
+
+```mermaid
+sequenceDiagram
+    participant P as Paperless
+    participant W1 as tag-document:8080
+    participant A1 as CursorAgent
+    participant W2 as tag-tax:8081
+    participant A2 as CursorAgent
+
+    P->>W1: Workflow1 DocumentAdded
+    W1->>A1: TaggingJob
+    A1->>P: document_update ai-tagged
+    P->>W2: Workflow2 DocumentUpdated
+    W2->>A2: TaxReviewJob
+    A2->>P: document_update ai-tax-reviewed
+```
+
+Die Reihenfolge steuert Paperless über zwei Workflows — nicht Docker. Stufe 1 antwortet asynchron (`202`); Stufe 2 feuert erst, wenn Paperless das Update mit `ai-tagged` meldet.
 
 ## Voraussetzungen
 
@@ -55,28 +76,52 @@ WEBHOOK_SECRET=ein-langes-zufaelliges-secret
 docker compose up -d --build
 ```
 
-Der Webhook-Receiver läuft auf Port `8080` (konfigurierbar über `WEBHOOK_PORT`).
+Zwei Instanzen starten automatisch:
+
+| Instanz | Container | Port | Prompt |
+|---|---|---|---|
+| Klassifikation | `paperless-ai-tagger-tag-document.md` | `8080` (`WEBHOOK_PORT_DOCUMENT`) | `tag-document.md` |
+| Steuerprüfung | `paperless-ai-tagger-tag-tax.md` | `8081` (`WEBHOOK_PORT_TAX`) | `tag-tax.md` |
 
 Healthcheck:
 
 ```bash
 curl http://localhost:8080/health
+curl http://localhost:8081/health
 ```
 
-### 3. Paperless-Workflow einrichten
+### 3. Paperless-Workflows einrichten
+
+Die Pipeline besteht aus zwei Workflows. Stufe 2 startet erst, wenn Stufe 1 das Dokument aktualisiert hat (Tag `ai-tagged` gesetzt).
+
+#### Workflow 1 — Klassifikation
 
 In Paperless: **Einstellungen → Workflows → Neuer Workflow**
 
 | Einstellung | Wert |
 |---|---|
 | Trigger | **Document Added** |
-| Filter | optional, z. B. „hat nicht Tag `ai-tagged`“ |
+| Filter | optional: Dokument hat **nicht** Tag `ai-tagged` |
 | Aktion | **Webhook** |
 
 **Webhook-URL:**
 
 ```
 http://<dein-server>:8080/webhook?secret=<WEBHOOK_SECRET>
+```
+
+#### Workflow 2 — Steuerprüfung (nachgelagert)
+
+| Einstellung | Wert |
+|---|---|
+| Trigger | **Document Updated** |
+| Filter | hat Tag `ai-tagged` **und** hat **nicht** Tag `ai-tax-reviewed` |
+| Aktion | **Webhook** |
+
+**Webhook-URL:**
+
+```
+http://<dein-server>:8081/webhook?secret=<WEBHOOK_SECRET>
 ```
 
 Wenn Paperless im selben Docker-Netzwerk läuft, die interne Service-URL verwenden und `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS=true` setzen.
@@ -124,7 +169,8 @@ paperless-ai-tagger/
 ├── docker-compose.yml          # webhook-receiver (inkl. paperless-ngx-mcp)
 ├── .env.example
 ├── prompts/
-│   └── tag-document.md         # Prompt-Template (anpassbar)
+│   ├── tag-document.md         # Prompt: allgemeine Klassifikation
+│   └── tag-tax.md              # Prompt: Steuerrelevanz-Prüfung
 ├── config/
 │   └── mcp.json.example        # Referenz (SDK nutzt inline MCP-Config)
 ├── services/
@@ -211,7 +257,11 @@ uvicorn app.main:app --reload --port 8080
 
 ## Prompt anpassen
 
-Die Datei `prompts/tag-document.md` wird als Template geladen. Verfügbare Platzhalter:
+Jede Instanz lädt ihr Prompt-Template über `PROMPT_TEMPLATE` (Dateiname unter `prompts/`, z. B. `tag-tax.md`) oder alternativ über den vollen Pfad `PROMPT_TEMPLATE_PATH` (für lokale Entwicklung).
+
+In Docker wird der Pfad automatisch zu `/app/prompts/<PROMPT_TEMPLATE>` aufgelöst. Container heißen `paperless-ai-tagger-<PROMPT_TEMPLATE>` (z. B. `paperless-ai-tagger-tag-tax.md`).
+
+Verfügbare Platzhalter in allen Prompt-Templates:
 
 | Platzhalter | Quelle |
 |---|---|
@@ -224,7 +274,7 @@ Die Datei `prompts/tag-document.md` wird als Template geladen. Verfügbare Platz
 Der Prompt wird beim Image-Build ins Container-Image kopiert. Nach Änderungen am Prompt Image neu bauen:
 
 ```bash
-docker compose up -d --build webhook-receiver
+docker compose up -d --build
 ```
 
 In Portainer: Stack **Pull and redeploy** (mit Rebuild).
@@ -233,19 +283,20 @@ In Portainer: Stack **Pull and redeploy** (mit Rebuild).
 
 ### Keine Endlosschleife
 
-- Workflow nur auf **„Document Added“** setzen, **nicht** auf „Document Updated“.
-- Der Agent setzt den Tag `ai-tagged` – ein Updated-Webhook würde sonst erneut feuern.
+- **Workflow 1** nur auf **„Document Added“** triggern, nicht auf „Document Updated“.
+- **Workflow 2** bewusst auf **„Document Updated“** mit Filter `ai-tagged` und ohne `ai-tax-reviewed` — so startet die Steuerprüfung erst nach abgeschlossener Klassifikation.
+- Workflow 2 setzt `ai-tax-reviewed` und löst damit keine erneute Steuerprüfung aus.
 
 ### Deduplizierung
 
-Bereits verarbeitete Dokument-IDs werden für `DEDUP_TTL_HOURS` (Standard: 24 h) übersprungen. Daten liegen im Docker-Volume `webhook-data`.
+Bereits verarbeitete Dokument-IDs werden pro Instanz für `DEDUP_TTL_HOURS` (Standard: 24 h) übersprungen. Jede Instanz hat ein eigenes Volume (`webhook-data-tag-document`, `webhook-data-tag-tax`), damit Stufe 2 nicht übersprungen wird, weil Stufe 1 dieselbe ID bereits verarbeitet hat.
 
 ### Sicherheit
 
 - **Paperless-API-Token** liegt im webhook-receiver-Container (für stdio-MCP) – nur im internen Netz betreiben.
 - **Webhook-Secret** lang und zufällig wählen.
 - Paperless-API-Token mit minimalen Rechten (eigener User).
-- `WEBHOOK_PORT` nur nach Bedarf nach außen exposen; Reverse Proxy mit TLS empfohlen.
+- `WEBHOOK_PORT_DOCUMENT` / `WEBHOOK_PORT_TAX` nur nach Bedarf nach außen exposen; Reverse Proxy mit TLS empfohlen.
 
 ### Kosten
 
@@ -284,7 +335,10 @@ Paperless sendet Webhook an `http://<server-ip>:8080/webhook?secret=...`.
 | `CURSOR_API_KEY` | ja | Cursor API Key |
 | `CURSOR_MODEL` | nein | Modell (Standard: `composer-2.5`) |
 | `WEBHOOK_SECRET` | ja | Secret für Webhook-Authentifizierung |
-| `WEBHOOK_PORT` | nein | Externer Port (Standard: `8080`) |
+| `WEBHOOK_PORT_DOCUMENT` | nein | Port für Klassifikation (Standard: `8080`) |
+| `WEBHOOK_PORT_TAX` | nein | Port für Steuerprüfung (Standard: `8081`) |
+| `PROMPT_TEMPLATE` | nein | Prompt-Dateiname unter `prompts/` (Standard: `tag-document.md`) |
+| `PROMPT_TEMPLATE_PATH` | nein | Voller Pfad zum Prompt (überschreibt `PROMPT_TEMPLATE`) |
 | `PAPERLESS_MCP_COMMAND` | nein | Pfad zum MCP-Binary (Standard: `/usr/local/bin/paperless-ngx-mcp`) |
 | `DEDUP_TTL_HOURS` | nein | Deduplizierungs-Fenster (Standard: `24`) |
 | `LOG_LEVEL` | nein | Log-Level (Standard: `INFO`) |
@@ -295,15 +349,17 @@ Paperless sendet Webhook an `http://<server-ip>:8080/webhook?secret=...`.
 |---|---|
 | `doc_url` leer im Webhook | `PAPERLESS_URL` in Paperless setzen |
 | `401 Invalid webhook secret` | Secret in URL/Header und `.env` abgleichen |
-| Agent startet nicht | `CURSOR_API_KEY` prüfen, Logs: `docker compose logs webhook-receiver` |
-| MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver paperless-ngx-mcp --version` |
+| Agent startet nicht | `CURSOR_API_KEY` prüfen, Logs: `docker compose logs -f` |
+| MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver-tag-document paperless-ngx-mcp --version` |
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
-| Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, nur Added-Trigger verwenden |
+| Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, Workflow-Filter prüfen |
+| Steuerprüfung startet nicht | Workflow 2 auf Port `8081`, Filter `ai-tagged` ohne `ai-tax-reviewed` |
 
 Logs ansehen:
 
 ```bash
-docker compose logs -f webhook-receiver
+docker compose logs -f webhook-receiver-tag-document
+docker compose logs -f webhook-receiver-tag-tax
 ```
 
 ## Lizenz

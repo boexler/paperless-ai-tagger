@@ -28,7 +28,11 @@ async def lifespan(app: FastAPI):
     app.state.settings = settings
     app.state.store = create_store(settings)
     app.state.tagger = DocumentTagger(settings)
-    logger.info("Webhook receiver started")
+    logger.info(
+        "Webhook receiver started (prompt: %s, path: %s)",
+        settings.prompt_template,
+        settings.prompt_template_path,
+    )
     yield
     logger.info("Webhook receiver stopped")
 
