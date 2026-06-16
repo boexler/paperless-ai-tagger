@@ -93,16 +93,18 @@ class DocumentTagger:
             )
 
         if result.status == "error":
+            error_message = getattr(result, "result", None) or "Agent run failed"
             logger.error(
-                "Cursor agent run failed for document %s (run_id=%s)",
+                "Cursor agent run failed for document %s (run_id=%s): %s",
                 document_id,
                 result.id,
+                error_message,
             )
             return TaggingResult(
                 document_id=document_id,
                 status="run_error",
                 run_id=result.id,
-                error=getattr(result, "result", None) or "Agent run failed",
+                error=error_message,
             )
 
         summary = getattr(result, "result", None)
