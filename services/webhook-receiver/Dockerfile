@@ -1,4 +1,4 @@
-FROM ghcr.io/freeformz/paperless-ngx-mcp:v0.0.12 AS paperless-mcp
+FROM ghcr.io/freeformz/paperless-ngx-mcp:0.0.12 AS paperless-mcp
 
 FROM python:3.12-slim
 
