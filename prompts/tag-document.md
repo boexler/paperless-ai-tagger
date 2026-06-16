@@ -22,8 +22,8 @@ Verwende ausschließlich diese `paperless-ngx-mcp`-Tool-Namen:
 * Keine Synonyme oder Duplikate anlegen.
 * Bestehende Tags am Dokument niemals entfernen.
 * Neue Tags nur anlegen, wenn kein vorhandenes Tag fachlich passt.
-* Bei Unsicherheit immer `needs-review` setzen.
-* Jedes automatisch bearbeitete Dokument erhält `ai-tagged`.
+* Bei Unsicherheit immer `ai-review-tag-document` setzen.
+* Jedes automatisch bearbeitete Dokument erhält `ai-tag-document`.
 * Die Entscheidung muss per Notiz nachvollziehbar dokumentiert werden.
 
 ## Kontext aus dem Webhook
@@ -151,7 +151,7 @@ Beispiele für generische Titel, die verbessert werden sollen:
 Wenn kein eindeutiger Titel ableitbar ist:
 
 * vorhandenen Titel nicht spekulativ ändern
-* `needs-review` setzen
+* `ai-review-tag-document` setzen
 * Begründung in der Notiz nennen
 
 Wenn du den Titel aktualisierst, übergib bei `document_update` zusätzlich zum vollständigen `tags`-Array auch das Titelfeld, sofern das Tool dieses Feld unterstützt.
@@ -184,31 +184,31 @@ Beispiele:
 * Bei einem Steuerbescheid eher Tags wie `Steuern`, `Behörde`, `wichtig` verwenden, sofern vorhanden.
 * Bei einem Vertrag eher Tags wie `Verträge`, `wichtig`, `original-aufbewahren` verwenden, sofern vorhanden.
 
-### 6. `ai-tagged` sicherstellen
+### 6. `ai-tag-document` sicherstellen
 
-Prüfe, ob ein Tag mit dem Namen `ai-tagged` existiert.
+Prüfe, ob ein Tag mit dem Namen `ai-tag-document` existiert.
 
 * Falls vorhanden: verwende dessen numerische ID.
 * Falls nicht vorhanden: erstelle es mit `tag_create`.
 
 Pflichtparameter:
 
-* `name="ai-tagged"`
+* `name="ai-tag-document"`
 
-Das Tag `ai-tagged` muss immer am Dokument gesetzt werden.
+Das Tag `ai-tag-document` muss immer am Dokument gesetzt werden.
 
-### 7. `needs-review` prüfen
+### 7. `ai-review-tag-document` prüfen
 
-Prüfe, ob das Tag `needs-review` existiert.
+Prüfe, ob das Tag `ai-review-tag-document` existiert.
 
 * Falls vorhanden: verwende dessen numerische ID, wenn Review nötig ist.
 * Falls nicht vorhanden und Review nötig ist: erstelle es mit `tag_create`.
 
 Pflichtparameter:
 
-* `name="needs-review"`
+* `name="ai-review-tag-document"`
 
-Setze `needs-review`, wenn mindestens einer der folgenden Fälle zutrifft:
+Setze `ai-review-tag-document`, wenn mindestens einer der folgenden Fälle zutrifft:
 
 * Titel wirkt unvollständig, generisch oder nicht aussagekräftig.
 * Korrespondent ist leer, unklar oder wahrscheinlich falsch.
@@ -226,11 +226,11 @@ Setze `needs-review`, wenn mindestens einer der folgenden Fälle zutrifft:
 * Es ist unklar, ob ein Original physisch aufbewahrt werden muss.
 * Du bist dir bei irgendeiner Einordnung nicht ausreichend sicher.
 
-`needs-review` bedeutet:
+`ai-review-tag-document` bedeutet:
 
 > Ein Mensch soll die Metadaten, Tags oder den Inhalt nochmals prüfen.
 
-`needs-review` bedeutet nicht automatisch, dass eine Aufgabe erledigt werden muss. Für tatsächlichen Handlungsbedarf soll ein vorhandenes passendes Status-Tag verwendet werden, z. B. `todo`, `offen`, `frist`, `bezahlen` oder ähnlich, sofern vorhanden.
+`ai-review-tag-document` bedeutet nicht automatisch, dass eine Aufgabe erledigt werden muss. Für tatsächlichen Handlungsbedarf soll ein vorhandenes passendes Status-Tag verwendet werden, z. B. `todo`, `offen`, `frist`, `bezahlen` oder ähnlich, sofern vorhanden.
 
 ### 8. Neue Tags nur restriktiv anlegen
 
@@ -258,7 +258,7 @@ Lege keine neuen Tags an für:
 Wenn ein neuer Tag fachlich sinnvoll wäre, aber du unsicher bist:
 
 * Tag nicht anlegen
-* `needs-review` setzen
+* `ai-review-tag-document` setzen
 * Vorschlag in der Notiz dokumentieren
 
 ### 9. Korrespondent und Dokumenttyp
@@ -268,7 +268,7 @@ Ergänze oder ändere Korrespondent und Dokumenttyp nur, wenn das verwendete MCP
 Wenn Korrespondent oder Dokumenttyp unklar sind:
 
 * nicht raten
-* `needs-review` setzen
+* `ai-review-tag-document` setzen
 * Unsicherheit in der Notiz nennen
 
 Wenn der vorhandene Dokumenttyp fachlich plausibel ist, lasse ihn unverändert.
@@ -282,8 +282,8 @@ Erstelle die finale Tag-Liste aus:
 * allen bereits am Dokument vorhandenen Tag-IDs
 * allen zusätzlich ausgewählten bestehenden Tag-IDs
 * neu erstellten Tag-IDs, falls wirklich erforderlich
-* `ai-tagged`
-* `needs-review`, falls Review nötig ist
+* `ai-tag-document`
+* `ai-review-tag-document`, falls Review nötig ist
 
 Entferne keine bestehenden Tags.
 
@@ -330,36 +330,36 @@ Die Notiz muss enthalten:
 * falls der Titel nicht geändert wurde: kurze Einschätzung, ob der vorhandene Titel plausibel war
 * gesetzte oder ergänzte Tags
 * kurze Begründung für die Tag-Auswahl
-* ob `ai-tagged` gesetzt wurde
-* ob `needs-review` gesetzt wurde
-* falls `needs-review` gesetzt wurde: konkrete Gründe
+* ob `ai-tag-document` gesetzt wurde
+* ob `ai-review-tag-document` gesetzt wurde
+* falls `ai-review-tag-document` gesetzt wurde: konkrete Gründe
 * falls neue Tags angelegt wurden: Name und Begründung
 * falls keine neuen Tags angelegt wurden: Hinweis, dass vorhandene Tags bevorzugt wurden
 * falls Korrespondent oder Dokumenttyp unklar wirken: Hinweis darauf
 * falls ein Handlungsbedarf erkennbar ist: Hinweis auf gesetztes Status- oder Aufgaben-Tag
-* falls ein Handlungsbedarf vermutet, aber nicht sicher erkannt wird: `needs-review` setzen und Grund nennen
+* falls ein Handlungsbedarf vermutet, aber nicht sicher erkannt wird: `ai-review-tag-document` setzen und Grund nennen
 
-Wenn kein Review nötig ist, muss die Notiz klar sagen, warum `needs-review` nicht gesetzt wurde.
+Wenn kein Review nötig ist, muss die Notiz klar sagen, warum `ai-review-tag-document` nicht gesetzt wurde.
 
 Wenn Review nötig ist, muss die Notiz klar sagen, was ein Mensch prüfen soll.
 
 Bevorzugtes Format der Notiz:
 
-`Automatische Einordnung: [Titelbewertung]. Tags ergänzt: [Tag-Liste]. Begründung: [kurze Begründung]. ai-tagged wurde gesetzt. needs-review wurde [gesetzt/nicht gesetzt]: [Grund]. [Neue Tags / keine neuen Tags].`
+`Automatische Einordnung: [Titelbewertung]. Tags ergänzt: [Tag-Liste]. Begründung: [kurze Begründung]. ai-tag-document wurde gesetzt. ai-review-tag-document wurde [gesetzt/nicht gesetzt]: [Grund]. [Neue Tags / keine neuen Tags].`
 
 Kompakte Beispiele:
 
-`Automatische Einordnung: Titel plausibel, nicht geändert. Tags ergänzt: Finanzen, Wohnen, Strom, ai-tagged. Begründung: Stromrechnung für Wohnung erkennbar. needs-review wurde nicht gesetzt: Metadaten und OCR-Inhalt sind plausibel. Keine neuen Tags angelegt.`
+`Automatische Einordnung: Titel plausibel, nicht geändert. Tags ergänzt: Finanzen, Wohnen, Strom, ai-tag-document. Begründung: Stromrechnung für Wohnung erkennbar. ai-review-tag-document wurde nicht gesetzt: Metadaten und OCR-Inhalt sind plausibel. Keine neuen Tags angelegt.`
 
-`Automatische Einordnung: Titel geändert von "Scan" zu "Rechnung – Stromabschlag Januar 2026". Tags ergänzt: Finanzen, Wohnen, Strom, ai-tagged. Begründung: Rechnung und Zeitraum eindeutig erkennbar. needs-review wurde nicht gesetzt: Einordnung eindeutig. Keine neuen Tags angelegt.`
+`Automatische Einordnung: Titel geändert von "Scan" zu "Rechnung – Stromabschlag Januar 2026". Tags ergänzt: Finanzen, Wohnen, Strom, ai-tag-document. Begründung: Rechnung und Zeitraum eindeutig erkennbar. ai-review-tag-document wurde nicht gesetzt: Einordnung eindeutig. Keine neuen Tags angelegt.`
 
-`Automatische Einordnung: Titel nicht geändert, da kein eindeutigerer Titel sicher ableitbar war. Tags ergänzt: Versicherung, Auto, ai-tagged, needs-review. Begründung: Vermutlich KFZ-Versicherung, Dokumenttyp unklar. needs-review wurde gesetzt: Mensch soll Dokumenttyp und Titel prüfen. Keine neuen Tags angelegt.`
+`Automatische Einordnung: Titel nicht geändert, da kein eindeutigerer Titel sicher ableitbar war. Tags ergänzt: Versicherung, Auto, ai-tag-document, ai-review-tag-document. Begründung: Vermutlich KFZ-Versicherung, Dokumenttyp unklar. ai-review-tag-document wurde gesetzt: Mensch soll Dokumenttyp und Titel prüfen. Keine neuen Tags angelegt.`
 
-`Automatische Einordnung: Titel geändert von "Dokument" zu "Bescheid – Pflegeversicherung". Tags ergänzt: Versicherung, Gesundheit, ai-tagged, needs-review. Begründung: Pflegeversicherung erkennbar, aber kein spezifisches vorhandenes Tag gefunden. needs-review wurde gesetzt: neues Tag "Pflegeversicherung" prüfen. Keine neuen Tags angelegt.`
+`Automatische Einordnung: Titel geändert von "Dokument" zu "Bescheid – Pflegeversicherung". Tags ergänzt: Versicherung, Gesundheit, ai-tag-document, ai-review-tag-document. Begründung: Pflegeversicherung erkennbar, aber kein spezifisches vorhandenes Tag gefunden. ai-review-tag-document wurde gesetzt: neues Tag "Pflegeversicherung" prüfen. Keine neuen Tags angelegt.`
 
-`Automatische Einordnung: Titel plausibel, nicht geändert. Tags ergänzt: Finanzen, Internet, offen, frist, ai-tagged, needs-review. Begründung: Mahnung mit Zahlungsaufforderung und Frist. needs-review wurde gesetzt: Frist und Zahlungsstatus prüfen. Keine neuen Tags angelegt.`
+`Automatische Einordnung: Titel plausibel, nicht geändert. Tags ergänzt: Finanzen, Internet, offen, frist, ai-tag-document, ai-review-tag-document. Begründung: Mahnung mit Zahlungsaufforderung und Frist. ai-review-tag-document wurde gesetzt: Frist und Zahlungsstatus prüfen. Keine neuen Tags angelegt.`
 
-`Automatische Einordnung: Titel geändert von "Scan" zu "Nachweis – Photovoltaik Einspeisevergütung". Tags ergänzt: Energie, Photovoltaik, ai-tagged, needs-review. Begründung: Photovoltaik-Bezug eindeutig, kein passendes spezifisches Tag vorhanden. needs-review wurde gesetzt: neues Tag und Taxonomie prüfen. Neues Tag angelegt: Photovoltaik.`
+`Automatische Einordnung: Titel geändert von "Scan" zu "Nachweis – Photovoltaik Einspeisevergütung". Tags ergänzt: Energie, Photovoltaik, ai-tag-document, ai-review-tag-document. Begründung: Photovoltaik-Bezug eindeutig, kein passendes spezifisches Tag vorhanden. ai-review-tag-document wurde gesetzt: neues Tag und Taxonomie prüfen. Neues Tag angelegt: Photovoltaik.`
 
 ## Entscheidungsregeln
 
@@ -411,7 +411,7 @@ Beispiel:
 
 ### Review vs. Aufgabe
 
-`needs-review` bedeutet:
+`ai-review-tag-document` bedeutet:
 
 * Die automatische Einordnung soll kontrolliert werden.
 
@@ -446,7 +446,7 @@ Beispiel:
 Wenn ein neues Tag sinnvoll wirken könnte, aber du nicht sicher bist, ob es dauerhaft in die Taxonomie passt:
 
 * nicht anlegen
-* `needs-review` setzen
+* `ai-review-tag-document` setzen
 * Vorschlag in der Notiz nennen
 
 Beispiel:
@@ -465,7 +465,7 @@ Beispiel:
 * Bei `tag_create` immer den Parameter `name` setzen.
 * `tag_create` niemals ohne `name` oder mit leerem Namen aufrufen.
 * Bei `document_update` das Feld `tags` als JSON-Array numerischer IDs übergeben.
-* Bei Unsicherheit lieber `needs-review` setzen als falsch klassifizieren.
+* Bei Unsicherheit lieber `ai-review-tag-document` setzen als falsch klassifizieren.
 * Antworte auf Deutsch mit einer kurzen Zusammenfassung der gesetzten Metadaten.
 
 ## Antwortformat
@@ -476,11 +476,11 @@ Die Antwort soll enthalten:
 
 * Dokument-ID
 * gesetzte oder ergänzte Tags
-* ob `ai-tagged` gesetzt wurde
-* ob `needs-review` gesetzt wurde
+* ob `ai-tag-document` gesetzt wurde
+* ob `ai-review-tag-document` gesetzt wurde
 * kurze Begründung
 * Hinweis auf neu erstellte Tags, falls vorhanden
 
 Beispiel:
 
-`Dokument {{document_id}} wurde geprüft und aktualisiert. Ergänzte Tags: Finanzen, Wohnen, Strom, ai-tagged. needs-review wurde nicht gesetzt, da Titel, Korrespondent, Dokumenttyp und OCR-Inhalt plausibel zusammenpassen. Es wurden keine neuen Tags angelegt.`
+`Dokument {{document_id}} wurde geprüft und aktualisiert. Ergänzte Tags: Finanzen, Wohnen, Strom, ai-tag-document. ai-review-tag-document wurde nicht gesetzt, da Titel, Korrespondent, Dokumenttyp und OCR-Inhalt plausibel zusammenpassen. Es wurden keine neuen Tags angelegt.`

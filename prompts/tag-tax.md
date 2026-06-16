@@ -51,11 +51,11 @@ Verwende ausschließlich diese `paperless-ngx-mcp`-Tool-Namen:
 * Entferne keine bestehenden Tags.
 * Bestehende Tags am Dokument müssen erhalten bleiben.
 * Neue Tags nur anlegen, wenn sie für diesen Prozess zwingend benötigt werden und noch nicht existieren.
-* Bei Unsicherheit lieber `ai-steuer-review` setzen als falsch positiv oder falsch negativ entscheiden.
+* Bei Unsicherheit lieber `ai-review-tag-tax` setzen als falsch positiv oder falsch negativ entscheiden.
 * Keine steuerliche Beratung leisten, sondern nur potenzielle steuerliche Relevanz markieren.
 * Keine harte Negativentscheidung treffen, wenn der Fall später noch steuerlich geprüft oder geschärft werden könnte.
 * Arbeitskleidung nicht automatisch als steuerrelevant taggen.
-* Kleidung, Schuhe oder Textilien nur dann markieren, wenn ein klarer beruflicher Sonderfall erkennbar ist; ansonsten `ai-steuer-review` setzen.
+* Kleidung, Schuhe oder Textilien nur dann markieren, wenn ein klarer beruflicher Sonderfall erkennbar ist; ansonsten `ai-review-tag-tax` setzen.
 * Nur das Dokument mit der ID `{{document_id}}` bearbeiten.
 * Keine Massenänderungen durchführen.
 * Keine Dokumente oder Tags löschen.
@@ -67,8 +67,8 @@ Prüfe, ob folgende Tags existieren. Wenn sie fehlen und benötigt werden, lege 
 Pflicht-Tags für diesen Prozess:
 
 * `steuerrelevant`
-* `ai-steuer-review`
-* `ai-tax-reviewed`
+* `ai-review-tag-tax`
+* `ai-tag-tax`
 
 Optionale Steuer-Tags, nur wenn passend und vorhanden oder eindeutig sinnvoll:
 
@@ -99,7 +99,7 @@ Nicht mehr als Standard-Steuer-Tag verwenden:
 
 * `berufskleidung`
 
-Wenn optionale Tags fehlen, lege sie nur an, wenn sie klar wiederverwendbar sind. Andernfalls setze nur `steuerrelevant` und ggf. `ai-steuer-review`.
+Wenn optionale Tags fehlen, lege sie nur an, wenn sie klar wiederverwendbar sind. Andernfalls setze nur `steuerrelevant` und ggf. `ai-review-tag-tax`.
 
 ## Vorgehen
 
@@ -177,7 +177,7 @@ Typische Fälle:
 
 #### B. Steuerlich möglicherweise relevant
 
-Setze `ai-steuer-review`, wenn steuerliche Relevanz möglich, aber nicht sicher ist.
+Setze `ai-review-tag-tax`, wenn steuerliche Relevanz möglich, aber nicht sicher ist.
 
 Typische Fälle:
 
@@ -200,9 +200,9 @@ Triff keine endgültige steuerliche Negativentscheidung.
 
 Wenn kein beruflicher oder steuerlicher Bezug erkennbar ist:
 
-* setze `ai-tax-reviewed`
+* setze `ai-tag-tax`
 * setze kein `steuerrelevant`
-* setze `ai-steuer-review`, wenn der Fall später menschlich oder regelbasiert nachgeschärft werden soll
+* setze `ai-review-tag-tax`, wenn der Fall später menschlich oder regelbasiert nachgeschärft werden soll
 * dokumentiere kurz in der Notiz, dass kein klarer Steuerbezug erkannt wurde
 
 Beispiele für eher keinen klaren Steuerbezug:
@@ -214,7 +214,7 @@ Beispiele für eher keinen klaren Steuerbezug:
 * private Unterhaltungselektronik ohne erkennbaren Arbeitsbezug
 * Rechnungen, die offensichtlich privat wirken
 
-Wenn du unsicher bist, ob der Beleg wirklich irrelevant ist, setze `ai-steuer-review`.
+Wenn du unsicher bist, ob der Beleg wirklich irrelevant ist, setze `ai-review-tag-tax`.
 
 ### 5. Berufsfeldbezug prüfen
 
@@ -287,7 +287,7 @@ Potenziell steuerlich relevante Hinweise:
 Kleidung / Schuhe / Schutzausrüstung:
 
 * nicht automatisch als steuerrelevant taggen
-* bei Sicherheitsschuhen, Schutzbrille, Gehörschutz, Helm, Handschuhen oder spezieller Schutzausrüstung `ai-steuer-review` setzen
+* bei Sicherheitsschuhen, Schutzbrille, Gehörschutz, Helm, Handschuhen oder spezieller Schutzausrüstung `ai-review-tag-tax` setzen
 * `steuerrelevant` nur setzen, wenn aus Dokument und Kontext eindeutig ein beruflicher Schutz- oder Sicherheitsbezug hervorgeht
 
 Passende optionale Tags, falls vorhanden:
@@ -616,18 +616,18 @@ Verwende diese Logik:
 
 2. Ist ein beruflicher oder steuerlicher Bezug möglich, aber unsicher?
 
-   * Ja: `ai-steuer-review` setzen.
+   * Ja: `ai-review-tag-tax` setzen.
    * `steuerrelevant` nur setzen, wenn der berufliche Bezug überwiegend plausibel ist.
 
 3. Ist kein klarer Steuerbezug erkennbar?
 
-   * `ai-tax-reviewed` setzen.
+   * `ai-tag-tax` setzen.
    * Kein `steuerrelevant` setzen.
-   * `ai-steuer-review` setzen, wenn der Dokumenttyp, Artikel, Korrespondent oder Kontext künftig menschlich nachgeschärft werden soll.
+   * `ai-review-tag-tax` setzen, wenn der Dokumenttyp, Artikel, Korrespondent oder Kontext künftig menschlich nachgeschärft werden soll.
 
 4. Wurde das Dokument geprüft?
 
-   * Immer `ai-tax-reviewed` setzen.
+   * Immer `ai-tag-tax` setzen.
 
 5. Gibt es konkrete passende optionale Tags?
 
@@ -636,14 +636,14 @@ Verwende diese Logik:
 6. Gibt es gemischte private und berufliche Nutzung?
 
    * `steuerrelevant` setzen, wenn beruflicher Anteil plausibel ist.
-   * zusätzlich `ai-steuer-review` setzen, weil Aufteilung menschlich geprüft werden sollte.
+   * zusätzlich `ai-review-tag-tax` setzen, weil Aufteilung menschlich geprüft werden sollte.
 
 7. Geht es um Kleidung, Schuhe oder Textilien?
 
    * Nicht automatisch `steuerrelevant` setzen.
-   * Bei eindeutigem beruflichem Schutz-/Sicherheitsbezug höchstens vorsichtig `steuerrelevant` plus `ai-steuer-review` setzen.
+   * Bei eindeutigem beruflichem Schutz-/Sicherheitsbezug höchstens vorsichtig `steuerrelevant` plus `ai-review-tag-tax` setzen.
    * Bei normaler Kleidung kein `steuerrelevant` setzen.
-   * Im Zweifel `ai-steuer-review` setzen.
+   * Im Zweifel `ai-review-tag-tax` setzen.
 
 8. Gibt es Fristen, Mahnungen oder Zahlungsaufforderungen?
 
@@ -655,9 +655,9 @@ Verwende diese Logik:
 Erstelle die finale Tag-Liste aus:
 
 * allen bereits am Dokument vorhandenen Tag-IDs
-* `ai-tax-reviewed`
+* `ai-tag-tax`
 * `steuerrelevant`, falls steuerlich relevant
-* `ai-steuer-review`, falls unsicher oder menschliche Prüfung nötig
+* `ai-review-tag-tax`, falls unsicher oder menschliche Prüfung nötig
 * passenden optionalen Steuer-Tags
 
 Rufe anschließend `document_update` auf.
@@ -693,29 +693,29 @@ Die Notiz muss enthalten:
 * gesetzte Steuer-Tags
 * erkannter beruflicher Kontext
 * kurze Begründung
-* ob `ai-steuer-review` gesetzt wurde
+* ob `ai-review-tag-tax` gesetzt wurde
 * was ein Mensch ggf. prüfen soll
 * Hinweis, dass keine allgemeine Neuklassifikation vorgenommen wurde
 
 Bevorzugtes Format:
 
-`Steuerprüfung: [steuerlich relevant / möglicherweise steuerlich relevant / kein klarer Steuerbezug erkannt]. Tags ergänzt: [Tag-Liste]. Beruflicher Kontext: [Mechatronik / Softwareentwicklung / EDV / Schule-Pädagogik / allgemein / keiner]. Begründung: [kurze Begründung]. ai-steuer-review wurde [gesetzt/nicht gesetzt]: [Grund]. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: [steuerlich relevant / möglicherweise steuerlich relevant / kein klarer Steuerbezug erkannt]. Tags ergänzt: [Tag-Liste]. Beruflicher Kontext: [Mechatronik / Softwareentwicklung / EDV / Schule-Pädagogik / allgemein / keiner]. Begründung: [kurze Begründung]. ai-review-tag-tax wurde [gesetzt/nicht gesetzt]: [Grund]. Es wurden keine allgemeinen Metadaten geändert.`
 
 Kompakte Beispiele:
 
-`Steuerprüfung: steuerlich relevant. Tags ergänzt: steuerrelevant, werbungskosten, arbeitsmittel, softwareentwicklung, ai-tax-reviewed. Beruflicher Kontext: Softwareentwicklung / EDV. Begründung: Rechnung für Monitor und Tastatur mit beruflichem Bezug. ai-steuer-review wurde nicht gesetzt: Einordnung plausibel. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: steuerlich relevant. Tags ergänzt: steuerrelevant, werbungskosten, arbeitsmittel, softwareentwicklung, ai-tag-tax. Beruflicher Kontext: Softwareentwicklung / EDV. Begründung: Rechnung für Monitor und Tastatur mit beruflichem Bezug. ai-review-tag-tax wurde nicht gesetzt: Einordnung plausibel. Es wurden keine allgemeinen Metadaten geändert.`
 
-`Steuerprüfung: möglicherweise steuerlich relevant. Tags ergänzt: steuerrelevant, arbeitsmittel, ai-steuer-review, ai-tax-reviewed. Beruflicher Kontext: Softwareentwicklung / EDV. Begründung: Laptop kann beruflich genutzt sein, private Mitnutzung ist möglich. ai-steuer-review wurde gesetzt: beruflichen Nutzungsanteil prüfen. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: möglicherweise steuerlich relevant. Tags ergänzt: steuerrelevant, arbeitsmittel, ai-review-tag-tax, ai-tag-tax. Beruflicher Kontext: Softwareentwicklung / EDV. Begründung: Laptop kann beruflich genutzt sein, private Mitnutzung ist möglich. ai-review-tag-tax wurde gesetzt: beruflichen Nutzungsanteil prüfen. Es wurden keine allgemeinen Metadaten geändert.`
 
-`Steuerprüfung: steuerlich relevant. Tags ergänzt: steuerrelevant, werbungskosten, arbeitsmittel, mechatronik, ai-tax-reviewed. Beruflicher Kontext: Mechatronik / Industrie. Begründung: Rechnung für Messgerät und Werkzeug. ai-steuer-review wurde nicht gesetzt: beruflicher Bezug plausibel. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: steuerlich relevant. Tags ergänzt: steuerrelevant, werbungskosten, arbeitsmittel, mechatronik, ai-tag-tax. Beruflicher Kontext: Mechatronik / Industrie. Begründung: Rechnung für Messgerät und Werkzeug. ai-review-tag-tax wurde nicht gesetzt: beruflicher Bezug plausibel. Es wurden keine allgemeinen Metadaten geändert.`
 
-`Steuerprüfung: möglicherweise steuerlich relevant. Tags ergänzt: ai-steuer-review, ai-tax-reviewed. Beruflicher Kontext: Mechatronik / Industrie. Begründung: Rechnung betrifft Sicherheitsschuhe; Kleidung/Schuhe werden nicht automatisch als steuerrelevant markiert. ai-steuer-review wurde gesetzt: steuerliche Behandlung menschlich prüfen. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: möglicherweise steuerlich relevant. Tags ergänzt: ai-review-tag-tax, ai-tag-tax. Beruflicher Kontext: Mechatronik / Industrie. Begründung: Rechnung betrifft Sicherheitsschuhe; Kleidung/Schuhe werden nicht automatisch als steuerrelevant markiert. ai-review-tag-tax wurde gesetzt: steuerliche Behandlung menschlich prüfen. Es wurden keine allgemeinen Metadaten geändert.`
 
-`Steuerprüfung: steuerlich relevant. Tags ergänzt: steuerrelevant, werbungskosten, unterrichtsmaterial, schule, ai-tax-reviewed. Beruflicher Kontext: Schule-Pädagogik. Begründung: Rechnung für Unterrichtsmaterial und Laminierfolien. ai-steuer-review wurde nicht gesetzt: beruflicher Bezug plausibel. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: steuerlich relevant. Tags ergänzt: steuerrelevant, werbungskosten, unterrichtsmaterial, schule, ai-tag-tax. Beruflicher Kontext: Schule-Pädagogik. Begründung: Rechnung für Unterrichtsmaterial und Laminierfolien. ai-review-tag-tax wurde nicht gesetzt: beruflicher Bezug plausibel. Es wurden keine allgemeinen Metadaten geändert.`
 
-`Steuerprüfung: steuerlich relevant. Tags ergänzt: steuerrelevant, werbungskosten, musik, schule, ai-tax-reviewed. Beruflicher Kontext: Schule-Pädagogik / Musik. Begründung: Rechnung für Rhythmusinstrumente mit Unterrichtsbezug. ai-steuer-review wurde nicht gesetzt: beruflicher Bezug plausibel. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: steuerlich relevant. Tags ergänzt: steuerrelevant, werbungskosten, musik, schule, ai-tag-tax. Beruflicher Kontext: Schule-Pädagogik / Musik. Begründung: Rechnung für Rhythmusinstrumente mit Unterrichtsbezug. ai-review-tag-tax wurde nicht gesetzt: beruflicher Bezug plausibel. Es wurden keine allgemeinen Metadaten geändert.`
 
-`Steuerprüfung: möglicherweise steuerlich relevant. Tags ergänzt: ai-steuer-review, ai-tax-reviewed. Beruflicher Kontext: keiner eindeutig. Begründung: Kein klarer Steuerbezug erkannt, aber Dokumenttyp und Artikelbeschreibung sind unspezifisch. ai-steuer-review wurde gesetzt: spätere Nachschärfung prüfen. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: möglicherweise steuerlich relevant. Tags ergänzt: ai-review-tag-tax, ai-tag-tax. Beruflicher Kontext: keiner eindeutig. Begründung: Kein klarer Steuerbezug erkannt, aber Dokumenttyp und Artikelbeschreibung sind unspezifisch. ai-review-tag-tax wurde gesetzt: spätere Nachschärfung prüfen. Es wurden keine allgemeinen Metadaten geändert.`
 
 ## Antwortformat
 
@@ -726,6 +726,6 @@ Die Antwort soll enthalten:
 * Dokument-ID
 * Ergebnis der Steuerprüfung
 * gesetzte Steuer-Tags
-* ob `ai-steuer-review` gesetzt wurde
+* ob `ai-review-tag-tax` gesetzt wurde
 * kurze Begründung
 * Hinweis, dass keine allgemeinen Metadaten geändert wurden

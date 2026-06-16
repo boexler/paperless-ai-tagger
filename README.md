@@ -19,8 +19,8 @@ flowchart LR
 | **Paperless-ngx** | Dokumentenverwaltung, feuert Webhook bei „Document Added“ |
 | **paperless-ngx-mcp** | MCP-Server (stdio) mit Zugriff auf die Paperless-API, im webhook-receiver-Image enthalten |
 | **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK (zwei Instanzen in der Pipeline) |
-| **prompts/tag-document.md** | Prompt für die allgemeine Klassifikation (setzt `ai-tagged`) |
-| **prompts/tag-tax.md** | Prompt für die nachgelagerte Steuerprüfung (setzt `ai-tax-reviewed`) |
+| **prompts/tag-document.md** | Prompt für die allgemeine Klassifikation (setzt `ai-tag-document`) |
+| **prompts/tag-tax.md** | Prompt für die nachgelagerte Steuerprüfung (setzt `ai-tag-tax`) |
 
 ## Zweistufige Pipeline
 
@@ -34,13 +34,13 @@ sequenceDiagram
 
     P->>W1: Workflow1 DocumentAdded
     W1->>A1: TaggingJob
-    A1->>P: document_update ai-tagged
+    A1->>P: document_update ai-tag-document
     P->>W2: Workflow2 DocumentUpdated
     W2->>A2: TaxReviewJob
-    A2->>P: document_update ai-tax-reviewed
+    A2->>P: document_update ai-tag-tax
 ```
 
-Die Reihenfolge steuert Paperless über zwei Workflows — nicht Docker. Stufe 1 antwortet asynchron (`202`); Stufe 2 feuert erst, wenn Paperless das Update mit `ai-tagged` meldet.
+Die Reihenfolge steuert Paperless über zwei Workflows — nicht Docker. Stufe 1 antwortet asynchron (`202`); Stufe 2 feuert erst, wenn Paperless das Update mit `ai-tag-document` meldet.
 
 ## Voraussetzungen
 
@@ -92,7 +92,7 @@ curl http://localhost:8081/health
 
 ### 3. Paperless-Workflows einrichten
 
-Die Pipeline besteht aus zwei Workflows. Stufe 2 startet erst, wenn Stufe 1 das Dokument aktualisiert hat (Tag `ai-tagged` gesetzt).
+Die Pipeline besteht aus zwei Workflows. Stufe 2 startet erst, wenn Stufe 1 das Dokument aktualisiert hat (Tag `ai-tag-document` gesetzt).
 
 #### Workflow 1 — Klassifikation
 
@@ -101,7 +101,7 @@ In Paperless: **Einstellungen → Workflows → Neuer Workflow**
 | Einstellung | Wert |
 |---|---|
 | Trigger | **Document Added** |
-| Filter | optional: Dokument hat **nicht** Tag `ai-tagged` |
+| Filter | optional: Dokument hat **nicht** Tag `ai-tag-document` |
 | Aktion | **Webhook** |
 
 **Webhook-URL:**
@@ -115,7 +115,7 @@ http://<dein-server>:8080/webhook?secret=<WEBHOOK_SECRET>
 | Einstellung | Wert |
 |---|---|
 | Trigger | **Document Updated** |
-| Filter | hat Tag `ai-tagged` **und** hat **nicht** Tag `ai-tax-reviewed` |
+| Filter | hat Tag `ai-tag-document` **und** hat **nicht** Tag `ai-tag-tax` |
 | Aktion | **Webhook** |
 
 **Webhook-URL:**
@@ -284,8 +284,8 @@ In Portainer: Stack **Pull and redeploy** (mit Rebuild).
 ### Keine Endlosschleife
 
 - **Workflow 1** nur auf **„Document Added“** triggern, nicht auf „Document Updated“.
-- **Workflow 2** bewusst auf **„Document Updated“** mit Filter `ai-tagged` und ohne `ai-tax-reviewed` — so startet die Steuerprüfung erst nach abgeschlossener Klassifikation.
-- Workflow 2 setzt `ai-tax-reviewed` und löst damit keine erneute Steuerprüfung aus.
+- **Workflow 2** bewusst auf **„Document Updated“** mit Filter `ai-tag-document` und ohne `ai-tag-tax` — so startet die Steuerprüfung erst nach abgeschlossener Klassifikation.
+- Workflow 2 setzt `ai-tag-tax` und löst damit keine erneute Steuerprüfung aus.
 
 ### Deduplizierung
 
@@ -353,7 +353,7 @@ Paperless sendet Webhook an `http://<server-ip>:8080/webhook?secret=...`.
 | MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver-tag-document paperless-ngx-mcp --version` |
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
 | Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, Workflow-Filter prüfen |
-| Steuerprüfung startet nicht | Workflow 2 auf Port `8081`, Filter `ai-tagged` ohne `ai-tax-reviewed` |
+| Steuerprüfung startet nicht | Workflow 2 auf Port `8081`, Filter `ai-tag-document` ohne `ai-tag-tax` |
 
 Logs ansehen:
 
