@@ -1,0 +1,39 @@
+services:
+  paperless-mcp:
+    image: ghcr.io/barryw/paperlessmcp:v0.1.18
+    restart: unless-stopped
+    environment:
+      PAPERLESS_BASE_URL: ${PAPERLESS_BASE_URL}
+      PAPERLESS_API_TOKEN: ${PAPERLESS_API_TOKEN}
+      MCP_PORT: 5000
+    networks:
+      - paperless-ai-tagger
+
+  webhook-receiver:
+    build:
+      context: ./services/webhook-receiver
+    restart: unless-stopped
+    environment:
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      CURSOR_API_KEY: ${CURSOR_API_KEY}
+      CURSOR_MODEL: ${CURSOR_MODEL:-composer-2.5}
+      PAPERLESS_MCP_URL: ${PAPERLESS_MCP_URL:-http://paperless-mcp:5000/mcp}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      DEDUP_TTL_HOURS: ${DEDUP_TTL_HOURS:-24}
+      PROMPT_TEMPLATE_PATH: /app/prompts/tag-document.md
+    volumes:
+      - ./prompts:/app/prompts:ro
+      - webhook-data:/data
+    ports:
+      - "${WEBHOOK_PORT:-8080}:8080"
+    networks:
+      - paperless-ai-tagger
+    depends_on:
+      - paperless-mcp
+
+networks:
+  paperless-ai-tagger:
+    driver: bridge
+
+volumes:
+  webhook-data:
