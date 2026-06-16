@@ -692,14 +692,20 @@ Die Notiz muss enthalten:
 * Ergebnis der Steuerprüfung
 * gesetzte Steuer-Tags
 * erkannter beruflicher Kontext
-* kurze Begründung
+* kurze Begründung für die Tag-Auswahl
+* ob `ai-tag-tax` gesetzt wurde
 * ob `ai-review-tag-tax` gesetzt wurde
-* was ein Mensch ggf. prüfen soll
+* falls `ai-review-tag-tax` gesetzt wurde: konkrete Gründe
 * Hinweis, dass keine allgemeine Neuklassifikation vorgenommen wurde
+* falls steuerliche Relevanz möglich, aber nicht sicher ist: `ai-review-tag-tax` setzen und Grund nennen
+
+Wenn kein Review nötig ist, muss die Notiz klar sagen, warum `ai-review-tag-tax` nicht gesetzt wurde.
+
+Wenn Review nötig ist, muss die Notiz klar sagen, was ein Mensch prüfen soll.
 
 Bevorzugtes Format:
 
-`Steuerprüfung: [steuerlich relevant / möglicherweise steuerlich relevant / kein klarer Steuerbezug erkannt]. Tags ergänzt: [Tag-Liste]. Beruflicher Kontext: [Mechatronik / Softwareentwicklung / EDV / Schule-Pädagogik / allgemein / keiner]. Begründung: [kurze Begründung]. ai-review-tag-tax wurde [gesetzt/nicht gesetzt]: [Grund]. Es wurden keine allgemeinen Metadaten geändert.`
+`Steuerprüfung: [steuerlich relevant / möglicherweise steuerlich relevant / kein klarer Steuerbezug erkannt]. Tags ergänzt: [Tag-Liste]. Beruflicher Kontext: [Mechatronik / Softwareentwicklung / EDV / Schule-Pädagogik / allgemein / keiner]. Begründung: [kurze Begründung]. ai-tag-tax wurde gesetzt. ai-review-tag-tax wurde [gesetzt/nicht gesetzt]: [Grund]. Es wurden keine allgemeinen Metadaten geändert.`
 
 Kompakte Beispiele:
 
@@ -726,6 +732,8 @@ Die Antwort soll enthalten:
 * Dokument-ID
 * Ergebnis der Steuerprüfung
 * gesetzte Steuer-Tags
+* ob `ai-tag-tax` gesetzt wurde
 * ob `ai-review-tag-tax` gesetzt wurde
+* falls `ai-review-tag-tax` gesetzt wurde: konkrete Gründe
 * kurze Begründung
 * Hinweis, dass keine allgemeinen Metadaten geändert wurden
