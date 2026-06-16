@@ -1,6 +1,6 @@
 services:
   paperless-mcp:
-    image: ghcr.io/barryw/paperlessmcp:v0.1.18
+    image: ghcr.io/barryw/paperlessmcp:v0.1.21
     restart: unless-stopped
     environment:
       PAPERLESS_BASE_URL: ${PAPERLESS_BASE_URL}
