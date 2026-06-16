@@ -366,6 +366,7 @@ Paperless sendet Webhook an `http://<server-ip>:8080/webhook?secret=...`.
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
 | Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, Workflow-Filter prüfen |
 | Steuerprüfung startet nicht | Workflow 2 auf Port `8081`, Filter `ai-tag-document` ohne `ai-tag-tax` |
+| `pip install` schlägt beim Image-Build fehl | Host braucht `linux/amd64` oder `linux/arm64` (kein 32-bit ARM). Genug Speicher/Platz für ~60 MB `cursor-sdk`-Wheel. Build-Log prüfen; bei Proxy `PIP_INDEX_URL` als Build-Arg setzen |
 
 Logs ansehen:
 
