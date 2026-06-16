@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Paperless AI Tagger",
-    description="Webhook receiver that tags Paperless documents via Cursor SDK + PaperlessMCP",
+    description="Webhook receiver that tags Paperless documents via Cursor SDK + paperless-ngx-mcp",
     version="0.1.0",
     lifespan=lifespan,
 )

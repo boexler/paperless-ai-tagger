@@ -2,7 +2,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from cursor_sdk import Agent, AgentOptions, CursorAgentError, HttpMcpServerConfig, LocalAgentOptions
+from cursor_sdk import Agent, AgentOptions, CursorAgentError, LocalAgentOptions, StdioMcpServerConfig
 
 from app.config import Settings
 
@@ -107,8 +107,13 @@ class DocumentTagger:
                 setting_sources=[],
             ),
             mcp_servers={
-                "paperless": HttpMcpServerConfig(
-                    url=self.settings.paperless_mcp_url,
+                "paperless": StdioMcpServerConfig(
+                    command=self.settings.paperless_mcp_command,
+                    args=["mcp"],
+                    env={
+                        "PAPERLESS_URL": self.settings.paperless_url,
+                        "PAPERLESS_TOKEN": self.settings.paperless_api_token,
+                    },
                 ),
             },
         )

@@ -2,7 +2,7 @@
 
 Automatisches Taggen von [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx)-Dokumenten per KI.
 
-Wenn in Paperless ein neues Dokument hinzukommt, feuert ein Workflow-Webhook diesen Dienst. Der Webhook-Receiver startet einen Cursor-Agenten über das **Cursor SDK** mit [PaperlessMCP](https://github.com/barryw/PaperlessMCP) und lässt das Dokument automatisch taggen.
+Wenn in Paperless ein neues Dokument hinzukommt, feuert ein Workflow-Webhook diesen Dienst. Der Webhook-Receiver startet einen Cursor-Agenten über das **Cursor SDK** mit [paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) und lässt das Dokument automatisch taggen.
 
 ## Architektur
 
@@ -10,14 +10,14 @@ Wenn in Paperless ein neues Dokument hinzukommt, feuert ein Workflow-Webhook die
 flowchart LR
     P[Paperless-ngx] -->|Workflow Webhook| W[webhook-receiver]
     W -->|Cursor SDK| A[Cursor Agent]
-    A -->|MCP| M[PaperlessMCP]
+    A -->|stdio MCP| M[paperless-ngx-mcp]
     M -->|REST API| P
 ```
 
 | Komponente | Rolle |
 |---|---|
 | **Paperless-ngx** | Dokumentenverwaltung, feuert Webhook bei „Document Added“ |
-| **PaperlessMCP** | MCP-Server mit Zugriff auf die Paperless-API |
+| **paperless-ngx-mcp** | MCP-Server (stdio) mit Zugriff auf die Paperless-API, im webhook-receiver-Image enthalten |
 | **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK |
 | **prompts/tag-document.md** | Fest definierter Prompt für das Tagging |
 
@@ -47,7 +47,7 @@ CURSOR_API_KEY=cursor_dein_api_key
 WEBHOOK_SECRET=ein-langes-zufaelliges-secret
 ```
 
-> **Image-Version:** In `docker-compose.yml` die PaperlessMCP-Version an die [aktuelle Release-Version](https://github.com/barryw/PaperlessMCP/releases) anpassen.
+> **Image-Version:** Das `paperless-ngx-mcp`-Binary wird beim Image-Build aus [freeformz/paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) übernommen. Version in `services/webhook-receiver/Dockerfile` anpassen.
 
 ### 2. Stack starten
 
@@ -121,7 +121,7 @@ WEBHOOK_SECRET=dein-secret ./scripts/smoke-test.sh
 
 ```
 paperless-ai-tagger/
-├── docker-compose.yml          # PaperlessMCP + webhook-receiver
+├── docker-compose.yml          # webhook-receiver (inkl. paperless-ngx-mcp)
 ├── .env.example
 ├── prompts/
 │   └── tag-document.md         # Prompt-Template (anpassbar)
@@ -152,18 +152,24 @@ Der Dienst nutzt das [Cursor Python SDK](https://cursor.com/docs/sdk/python) (`c
 Kernlogik in `services/webhook-receiver/app/tagger.py`:
 
 ```python
-result = Agent.prompt(
-    prompt,
-    AgentOptions(
-        api_key=settings.cursor_api_key,
-        model=settings.cursor_model,
-        local=LocalAgentOptions(cwd="/app", setting_sources=[]),
-        mcp_servers={
-            "paperless": HttpMcpServerConfig(url=settings.paperless_mcp_url),
-        },
-    ),
+AgentOptions(
+    api_key=settings.cursor_api_key,
+    model=settings.cursor_model,
+    local=LocalAgentOptions(cwd="/app", setting_sources=[]),
+    mcp_servers={
+        "paperless": StdioMcpServerConfig(
+            command="/usr/local/bin/paperless-ngx-mcp",
+            args=["mcp"],
+            env={
+                "PAPERLESS_URL": settings.paperless_url,
+                "PAPERLESS_TOKEN": settings.paperless_api_token,
+            },
+        ),
+    },
 )
 ```
+
+`paperless-ngx-mcp` spricht **stdio-MCP** (kein HTTP-Port). Der Cursor-Agent startet den Prozess als Subprozess im webhook-receiver-Container.
 
 ### Lokale Entwicklung (ohne Docker)
 
@@ -172,10 +178,22 @@ cd services/webhook-receiver
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+```
 
+`paperless-ngx-mcp` installieren (Go):
+
+```bash
+go install github.com/freeformz/paperless-ngx-mcp@latest
+```
+
+Umgebungsvariablen:
+
+```bash
 export WEBHOOK_SECRET=test
 export CURSOR_API_KEY=cursor_...
-export PAPERLESS_MCP_URL=http://localhost:5000/mcp
+export PAPERLESS_BASE_URL=http://localhost:8000
+export PAPERLESS_API_TOKEN=dein-token
+export PAPERLESS_MCP_COMMAND=$HOME/go/bin/paperless-ngx-mcp   # Windows: Pfad anpassen
 export PROMPT_TEMPLATE_PATH=../../prompts/tag-document.md
 
 uvicorn app.main:app --reload --port 8080
@@ -224,7 +242,7 @@ Bereits verarbeitete Dokument-IDs werden für `DEDUP_TTL_HOURS` (Standard: 24 h)
 
 ### Sicherheit
 
-- **PaperlessMCP** hat keine eingebaute Auth auf `/mcp` – nur im internen Docker-Netz betreiben.
+- **Paperless-API-Token** liegt im webhook-receiver-Container (für stdio-MCP) – nur im internen Netz betreiben.
 - **Webhook-Secret** lang und zufällig wählen.
 - Paperless-API-Token mit minimalen Rechten (eigener User).
 - `WEBHOOK_PORT` nur nach Bedarf nach außen exposen; Reverse Proxy mit TLS empfohlen.
@@ -261,13 +279,13 @@ Paperless sendet Webhook an `http://<server-ip>:8080/webhook?secret=...`.
 
 | Variable | Pflicht | Beschreibung |
 |---|---|---|
-| `PAPERLESS_BASE_URL` | ja | URL der Paperless-Instanz (für PaperlessMCP) |
-| `PAPERLESS_API_TOKEN` | ja | API-Token für Paperless |
+| `PAPERLESS_BASE_URL` | ja | URL der Paperless-Instanz (Alias: `PAPERLESS_URL`) |
+| `PAPERLESS_API_TOKEN` | ja | API-Token für Paperless (Alias: `PAPERLESS_TOKEN`) |
 | `CURSOR_API_KEY` | ja | Cursor API Key |
 | `CURSOR_MODEL` | nein | Modell (Standard: `composer-2.5`) |
 | `WEBHOOK_SECRET` | ja | Secret für Webhook-Authentifizierung |
 | `WEBHOOK_PORT` | nein | Externer Port (Standard: `8080`) |
-| `PAPERLESS_MCP_URL` | nein | MCP-URL (Standard: `http://paperless-mcp:5000/mcp`) |
+| `PAPERLESS_MCP_COMMAND` | nein | Pfad zum MCP-Binary (Standard: `/usr/local/bin/paperless-ngx-mcp`) |
 | `DEDUP_TTL_HOURS` | nein | Deduplizierungs-Fenster (Standard: `24`) |
 | `LOG_LEVEL` | nein | Log-Level (Standard: `INFO`) |
 
@@ -278,7 +296,7 @@ Paperless sendet Webhook an `http://<server-ip>:8080/webhook?secret=...`.
 | `doc_url` leer im Webhook | `PAPERLESS_URL` in Paperless setzen |
 | `401 Invalid webhook secret` | Secret in URL/Header und `.env` abgleichen |
 | Agent startet nicht | `CURSOR_API_KEY` prüfen, Logs: `docker compose logs webhook-receiver` |
-| MCP-Verbindung fehlgeschlagen | PaperlessMCP läuft? `docker compose logs paperless-mcp` |
+| MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver paperless-ngx-mcp --version` |
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
 | Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, nur Added-Trigger verwenden |
 
@@ -286,7 +304,6 @@ Logs ansehen:
 
 ```bash
 docker compose logs -f webhook-receiver
-docker compose logs -f paperless-mcp
 ```
 
 ## Lizenz
@@ -296,5 +313,5 @@ MIT
 ## Danksagungen
 
 - [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx)
-- [PaperlessMCP](https://github.com/barryw/PaperlessMCP) von barryw
+- [paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) von freeformz
 - [Cursor SDK](https://cursor.com/docs/sdk/python)

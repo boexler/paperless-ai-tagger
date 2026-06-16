@@ -1,7 +1,12 @@
 {
   "mcpServers": {
     "paperless": {
-      "url": "http://paperless-mcp:5000/mcp"
+      "command": "/usr/local/bin/paperless-ngx-mcp",
+      "args": ["mcp"],
+      "env": {
+        "PAPERLESS_URL": "http://paperless:8000",
+        "PAPERLESS_TOKEN": "your-paperless-api-token"
+      }
     }
   }
 }

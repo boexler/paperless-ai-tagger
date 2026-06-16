@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,9 +8,15 @@ class Settings(BaseSettings):
     webhook_secret: str = Field(validation_alias="WEBHOOK_SECRET")
     cursor_api_key: str = Field(validation_alias="CURSOR_API_KEY")
     cursor_model: str = Field(default="composer-2.5", validation_alias="CURSOR_MODEL")
-    paperless_mcp_url: str = Field(
-        default="http://paperless-mcp:5000/mcp",
-        validation_alias="PAPERLESS_MCP_URL",
+    paperless_url: str = Field(
+        validation_alias=AliasChoices("PAPERLESS_URL", "PAPERLESS_BASE_URL"),
+    )
+    paperless_api_token: str = Field(
+        validation_alias=AliasChoices("PAPERLESS_TOKEN", "PAPERLESS_API_TOKEN"),
+    )
+    paperless_mcp_command: str = Field(
+        default="/usr/local/bin/paperless-ngx-mcp",
+        validation_alias="PAPERLESS_MCP_COMMAND",
     )
     prompt_template_path: str = Field(
         default="/app/prompts/tag-document.md",

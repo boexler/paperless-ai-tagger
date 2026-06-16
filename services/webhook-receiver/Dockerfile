@@ -1,6 +1,10 @@
+FROM ghcr.io/freeformz/paperless-ngx-mcp:v0.0.12 AS paperless-mcp
+
 FROM python:3.12-slim
 
 WORKDIR /app
+
+COPY --from=paperless-mcp /paperless-ngx-mcp /usr/local/bin/paperless-ngx-mcp
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
