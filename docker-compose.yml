@@ -16,32 +16,32 @@ x-webhook-receiver: &webhook-receiver-base
     - paperless-ai-tagger
 
 services:
-  webhook-receiver-tag-document:
+  webhook-receiver-01-tag-document:
     <<: *webhook-receiver-base
-    container_name: paperless-ai-tagger-tag-document.md
+    container_name: paperless-ai-tagger-01-tag-document.md
     environment:
       <<: *webhook-receiver-env
-      PROMPT_TEMPLATE: tag-document.md
+      PROMPT_TEMPLATE: 01-tag-document.md
     volumes:
-      - webhook-data-tag-document:/data
+      - webhook-data-01-tag-document:/data
     ports:
-      - "${WEBHOOK_PORT_DOCUMENT:-8080}:8080"
+      - "${WEBHOOK_PORT_01:-8081}:8080"
 
-  webhook-receiver-tag-tax:
+  webhook-receiver-02-tag-tax:
     <<: *webhook-receiver-base
-    container_name: paperless-ai-tagger-tag-tax.md
+    container_name: paperless-ai-tagger-02-tag-tax.md
     environment:
       <<: *webhook-receiver-env
-      PROMPT_TEMPLATE: tag-tax.md
+      PROMPT_TEMPLATE: 02-tag-tax.md
     volumes:
-      - webhook-data-tag-tax:/data
+      - webhook-data-02-tag-tax:/data
     ports:
-      - "${WEBHOOK_PORT_TAX:-8081}:8080"
+      - "${WEBHOOK_PORT_02:-8082}:8080"
 
 networks:
   paperless-ai-tagger:
     driver: bridge
 
 volumes:
-  webhook-data-tag-document:
-  webhook-data-tag-tax:
+  webhook-data-01-tag-document:
+  webhook-data-02-tag-tax:

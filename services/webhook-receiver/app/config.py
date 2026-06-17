@@ -1,7 +1,7 @@
 from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_PROMPT_TEMPLATE = "tag-document.md"
+DEFAULT_PROMPT_TEMPLATE = "01-tag-document.md"
 DOCKER_PROMPTS_DIR = "/app/prompts"
 
 

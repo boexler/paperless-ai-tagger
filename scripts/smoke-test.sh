@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://localhost:8080}"
+BASE_URL="${BASE_URL:-http://localhost:8081}"
 SECRET="${WEBHOOK_SECRET:-change-me-to-a-long-random-string}"
 
 echo "Health check..."

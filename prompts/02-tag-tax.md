@@ -2,7 +2,7 @@
 
 Prüfe das bereits klassifizierte Paperless-Dokument mit der ID **{{document_id}}** darauf, ob es potenziell steuerlich relevant ist.
 
-Dieser Prozess ist ein nachgelagerter Prüfprozess. Es geht ausschließlich darum, steuerlich relevante Dokumente zu erkennen und passend zu taggen. Es sollen keine allgemeinen Klassifikationen neu vorgenommen werden.
+Dieser Prozess ist Stufe 02 und ein nachgelagerter Prüfprozess nach der Klassifikation in Stufe 01 (`01-tag-document.md`). Korrespondent, Dokumenttyp und Titel wurden dort bereits gesetzt. Es geht ausschließlich darum, steuerlich relevante Dokumente zu erkennen und passend zu taggen. Es sollen keine allgemeinen Klassifikationen neu vorgenommen werden.
 
 ## Ziel
 
