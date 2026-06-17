@@ -413,21 +413,69 @@ Wenn kein Review nötig ist, muss die Notiz klar sagen, warum `ai-review-tag-doc
 
 Wenn Review nötig ist, muss die Notiz klar sagen, was ein Mensch prüfen soll.
 
+#### Formatregeln
+
+* Übergebe die Notiz **mehrzeilig** mit **echten Zeilenumbrüchen** im `note`-Parameter.
+* Kein Fließtext in einer Zeile.
+* Schreibe nicht den Literaltext `\n` in die Notiz — verwende echte Zeilenumbrüche.
+* Zeile 1: Überschrift `Automatische Einordnung:`
+* Folgezeilen: je ein Bullet mit `- ` pro Themenblock in dieser Reihenfolge:
+  * Korrespondent
+  * Dokumenttyp
+  * Titel
+  * Tags + Begründung
+  * `ai-tag-document`
+  * `ai-review-tag-document`
+  * Neue Tags / keine neuen Tags
+  * optional: Handlungsbedarf / Status-Tag
+
 Bevorzugtes Format der Notiz:
 
-`Automatische Einordnung: Korrespondent [geändert/nicht geändert]. Dokumenttyp [geändert/nicht geändert]. Titel [geändert/nicht geändert]. Tags ergänzt: [Tag-Liste]. Begründung: [kurze Begründung]. ai-tag-document wurde gesetzt. ai-review-tag-document wurde [gesetzt/nicht gesetzt]: [Grund]. [Neue Tags / keine neuen Tags].`
+```
+Automatische Einordnung:
+- Korrespondent [geändert/nicht geändert, plausibel/unklar, ggf. alter und neuer Wert].
+- Dokumenttyp [geändert/nicht geändert, plausibel/unklar, ggf. alter und neuer Wert].
+- Titel [geändert/nicht geändert, plausibel/unklar, ggf. alter und neuer Wert].
+- Tags ergänzt: [Tag-Liste]. Begründung: [kurze Begründung].
+- ai-tag-document wurde gesetzt.
+- ai-review-tag-document wurde [gesetzt/nicht gesetzt]: [Grund].
+- [Neue Tags angelegt: … / Keine neuen Tags angelegt.]
+- [optional: Handlungsbedarf / Status-Tag]
+```
 
-Kompakte Beispiele:
+Beispiele:
 
-`Automatische Einordnung: Korrespondent nicht geändert, plausibel (Stadtwerke). Dokumenttyp nicht geändert, plausibel (Rechnung). Titel plausibel, nicht geändert. Tags ergänzt: Finanzen, Wohnen, Strom, ai-tag-document. Begründung: Stromrechnung für Wohnung erkennbar. ai-review-tag-document wurde nicht gesetzt: Metadaten und OCR-Inhalt sind plausibel. Keine neuen Tags angelegt.`
+```
+Automatische Einordnung:
+- Korrespondent nicht geändert, plausibel (eBay - saturn, Media Markt E-Business GmbH/Saturn).
+- Dokumenttyp nicht geändert, plausibel (Rechnung). Titel geändert von "Rechnung zu deiner Bestellung (257396575)" zu "Rechnung – Apple iPad 10.9 128GB (Bestellung 257396575)".
+- Tags ergänzt: EDV, ai-tag-document. Begründung: Saturn/eBay-Rechnung für Apple iPad, bereits per Onlinezahlung beglichen (Restbetrag 0,00 EUR).
+- ai-tag-document wurde gesetzt.
+- ai-review-tag-document wurde nicht gesetzt: Korrespondent, Dokumenttyp, OCR-Inhalt und Produkt eindeutig erkennbar, kein Handlungsbedarf.
+- Keine neuen Tags angelegt.
+```
 
-`Automatische Einordnung: Korrespondent geändert von leer zu "Telekom". Dokumenttyp geändert von leer zu "Rechnung". Titel geändert von "Scan" zu "Rechnung – Stromabschlag Januar 2026". Tags ergänzt: Finanzen, Wohnen, Strom, ai-tag-document. Begründung: Rechnung und Zeitraum eindeutig erkennbar. ai-review-tag-document wurde nicht gesetzt: Einordnung eindeutig. Keine neuen Tags angelegt.`
+```
+Automatische Einordnung:
+- Korrespondent nicht geändert, plausibel (Stadtwerke).
+- Dokumenttyp nicht geändert, plausibel (Rechnung).
+- Titel plausibel, nicht geändert.
+- Tags ergänzt: Finanzen, Wohnen, Strom, ai-tag-document. Begründung: Stromrechnung für Wohnung erkennbar.
+- ai-tag-document wurde gesetzt.
+- ai-review-tag-document wurde nicht gesetzt: Metadaten und OCR-Inhalt sind plausibel.
+- Keine neuen Tags angelegt.
+```
 
-`Automatische Einordnung: Korrespondent nicht geändert, plausibel (Allianz). Dokumenttyp nicht geändert, unklar. Titel nicht geändert, da kein eindeutigerer Titel sicher ableitbar war. Tags ergänzt: Versicherung, Auto, ai-tag-document, ai-review-tag-document. Begründung: Vermutlich KFZ-Versicherung. ai-review-tag-document wurde gesetzt: Mensch soll Dokumenttyp und Titel prüfen. Keine neuen Tags angelegt.`
-
-`Automatische Einordnung: Korrespondent nicht geändert, plausibel. Dokumenttyp geändert von "Dokument" zu "Bescheid". Titel geändert von "Dokument" zu "Bescheid – Pflegeversicherung". Tags ergänzt: Versicherung, Gesundheit, ai-tag-document, ai-review-tag-document. Begründung: Pflegeversicherung erkennbar, aber kein spezifisches vorhandenes Tag gefunden. ai-review-tag-document wurde gesetzt: neues Tag "Pflegeversicherung" prüfen. Keine neuen Tags angelegt.`
-
-`Automatische Einordnung: Korrespondent nicht geändert, plausibel. Dokumenttyp nicht geändert, plausibel (Mahnung). Titel plausibel, nicht geändert. Tags ergänzt: Finanzen, Internet, offen, frist, ai-tag-document, ai-review-tag-document. Begründung: Mahnung mit Zahlungsaufforderung und Frist. ai-review-tag-document wurde gesetzt: Frist und Zahlungsstatus prüfen. Keine neuen Tags angelegt.`
+```
+Automatische Einordnung:
+- Korrespondent nicht geändert, plausibel (Allianz).
+- Dokumenttyp nicht geändert, unklar.
+- Titel nicht geändert, da kein eindeutigerer Titel sicher ableitbar war.
+- Tags ergänzt: Versicherung, Auto, ai-tag-document, ai-review-tag-document. Begründung: Vermutlich KFZ-Versicherung.
+- ai-tag-document wurde gesetzt.
+- ai-review-tag-document wurde gesetzt: Mensch soll Dokumenttyp und Titel prüfen.
+- Keine neuen Tags angelegt.
+```
 
 ## Entscheidungsregeln
 
