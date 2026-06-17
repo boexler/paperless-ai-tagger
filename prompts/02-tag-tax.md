@@ -127,7 +127,27 @@ Parameter:
 
 * `id={{document_id}}`
 
-Analysiere:
+#### Duplikat-Ausschluss
+
+Wenn das Dokument bereits das Tag `Delete` hat (E-Mail-Duplikat aus Stufe 01):
+
+* **keine** Steuerprüfung durchführen
+* nur `ai-tag-tax` setzen (Pflicht-Tag für diesen Prozess)
+* kurze mehrzeilige Notiz mit `document_note_add`
+* keine anderen Metadaten ändern
+* mit Antwortformat antworten und den Prozess beenden
+
+Notiz-Beispiel:
+
+```
+Steuerprüfung:
+- Ergebnis: übersprungen.
+- Grund: Dokument als E-Mail-Duplikat markiert (Tag Delete).
+- ai-tag-tax wurde gesetzt.
+- Es wurden keine allgemeinen Metadaten geändert.
+```
+
+Analysiere (nur wenn kein Tag `Delete` gesetzt ist):
 
 * Titel
 * Korrespondent

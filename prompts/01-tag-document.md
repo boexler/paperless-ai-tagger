@@ -17,6 +17,7 @@ Verwende ausschließlich diese `paperless-ngx-mcp`-Tool-Namen:
 | Dokumenttypen auflisten | `document_type_list`  |
 | Dokumenttyp anlegen    | `document_type_create` |
 | Dokument lesen         | `document_get`         |
+| Dokument-Metadaten     | `document_metadata`    |
 | Dokument aktualisieren | `document_update`      |
 | Notiz hinzufügen       | `document_note_add`    |
 
@@ -104,6 +105,48 @@ Analysiere insbesondere:
 * OCR-Text / `content`
 * Dokumentdatum, falls vorhanden
 * erkennbare Fristen, Zahlungsziele oder Handlungsbedarfe
+
+### 4a. E-Mail/PDF-Duplikat prüfen
+
+Prüfe direkt nach Schritt 4, ob das aktuelle Dokument ein redundantes E-Mail-Duplikat zu einem PDF-Anhang ist (typisch beim E-Mail-Import: E-Mail und Rechnungs-PDF mit gleichem Titel).
+
+Verwende `document_get` für `{{document_id}} - 1` und `{{document_id}} + 1`. Ein fehlgeschlagener Abruf (Dokument existiert nicht) ist kein Fehler — dann diesen Nachbarn ignorieren.
+
+**Erkennungskriterien (alle müssen zutreffen):**
+
+1. Das Nachbar-Dokument existiert.
+2. Der Titel des Nachbarn ist **exakt** gleich dem Titel des aktuellen Dokuments (case-sensitive, kein Trim-Unterschied).
+3. `|nachbar_id - {{document_id}}| = 1`.
+
+**E-Mail vs. PDF bestimmen** (Priorität):
+
+1. `document_metadata`: MIME wie `message/rfc822`, `text/html` → E-Mail; `application/pdf` → PDF.
+2. Originaldateiname: `.eml`, `.msg` → E-Mail; `.pdf` → PDF.
+3. OCR-Inhalt: typische E-Mail-Header (`From:`, `To:`, `Subject:`, `Content-Type:`) → E-Mail.
+4. Bei Widerspruch oder Unklarheit: **kein** `Delete`-Tag. Fahre mit der normalen Klassifikation fort und setze `ai-review-tag-document` mit Begründung „Duplikatverdacht“.
+
+**Tag `Delete`:**
+
+* Mit `tag_list` prüfen, ob ein Tag `Delete` existiert.
+* Falls nicht vorhanden: `tag_create` mit `name="Delete"`.
+* Bestehende Tags beim `document_update` immer vollständig mitgeben.
+
+**Aktionen:**
+
+| Fall | Aktion |
+| --- | --- |
+| **Aktuelles Dokument = E-Mail**, Nachbar = PDF | Am aktuellen Dokument: Tag `Delete` + `ai-tag-document` setzen, kurze mehrzeilige Notiz (siehe unten). **Schritte 5–13 überspringen.** Antwort nur mit Duplikat-Zusammenfassung (siehe Antwortformat). |
+| **Aktuelles Dokument = PDF**, Nachbar = E-Mail | Am **Nachbar** per `document_update`: bestehende Tags behalten, `Delete` ergänzen. `document_note_add` am Nachbar. Am aktuellen Dokument **normal** mit Schritt 5 fortfahren. |
+| **Unklar** | Kein `Delete`. Normale Klassifikation; bei Duplikatverdacht `ai-review-tag-document` setzen. |
+
+**Notiz bei E-Mail-Duplikat (kurz, mehrzeilig, echte Zeilenumbrüche):**
+
+```
+E-Mail/PDF-Duplikat:
+- Nachbar-Dokument: [ID].
+- Grund: Gleicher Titel, aufeinanderfolgende IDs, E-Mail redundant zum PDF-Anhang.
+- Aktion: Tag Delete gesetzt. Manuelle Löschung in Paperless empfohlen.
+```
 
 ### 5. Bestehende Dokument-Tags sichern
 
@@ -575,6 +618,7 @@ Beispiel:
 * Keine Tags löschen.
 * Keine Massenänderungen durchführen.
 * Nur das Dokument mit der ID `{{document_id}}` bearbeiten.
+* Ausnahme Duplikat-Prüfung (Schritt 4a): Das Nachbar-Dokument (ID ±1) darf **nur** mit Tag `Delete` und einer Notiz bearbeitet werden — keine weiteren Metadatenänderungen am Nachbar.
 * Keine vorhandenen Tags entfernen.
 * Keine Synonyme oder Duplikate erzeugen.
 * Maximal 5 neue Tags pro Dokument.
@@ -597,7 +641,16 @@ Die Antwort soll enthalten:
 * ob `ai-review-tag-document` gesetzt wurde
 * kurze Begründung
 * Hinweis auf neu erstellte Tags, Korrespondenten oder Dokumenttypen, falls vorhanden
+* bei E-Mail/PDF-Duplikat: Hinweis, ob Klassifikation übersprungen wurde oder ein Nachbar mit `Delete` markiert wurde
 
 Beispiel:
 
 `Dokument {{document_id}} wurde geprüft und aktualisiert. Korrespondent: Stadtwerke (unverändert). Dokumenttyp: Rechnung (unverändert). Ergänzte Tags: Finanzen, Wohnen, Strom, ai-tag-document. ai-review-tag-document wurde nicht gesetzt, da Titel, Korrespondent, Dokumenttyp und OCR-Inhalt plausibel zusammenpassen. Es wurden keine neuen Tags angelegt.`
+
+Beispiel bei E-Mail-Duplikat (Klassifikation übersprungen):
+
+`Dokument {{document_id}}: E-Mail/PDF-Duplikat erkannt. Tags: Delete, ai-tag-document. Klassifikation übersprungen, da E-Mail redundant zum PDF-Nachbar [ID].`
+
+Beispiel bei PDF mit E-Mail-Nachbar:
+
+`Dokument {{document_id}} wurde normal klassifiziert. Nachbar-Dokument [ID] als E-Mail-Duplikat mit Delete markiert.`
