@@ -31,6 +31,8 @@ Verwende ausschließlich diese `paperless-ngx-mcp`-Tool-Namen:
 * Jedes automatisch bearbeitete Dokument erhält `ai-tag-document`.
 * Die Entscheidung muss per Notiz nachvollziehbar dokumentiert werden.
 * Korrespondent und Dokumenttyp vor Titel und Tags festlegen, damit die Einordnung konsistent bleibt.
+* Steuerbezogene Tags nicht setzen und nicht neu anlegen — steuerliche Relevanz gehört nicht zu diesem Prozess.
+* Bereits am Dokument vorhandene Steuer-Tags behalten (siehe Regel „Tags niemals entfernen“).
 
 ## Kontext aus dem Webhook
 
@@ -279,6 +281,22 @@ Wenn kein eindeutiger Titel ableitbar ist:
 * `ai-review-tag-document` setzen
 * Begründung in der Notiz nennen
 
+## Steuer-Tags (nicht setzen)
+
+In diesem Prozess keine steuerbezogenen Tags setzen oder neu anlegen — auch nicht, wenn sie in `tag_list` bereits existieren. Steuerliche Relevanz bewertest du hier nicht.
+
+**Verbotene Tag-Namen** (nicht ergänzen, nicht neu anlegen):
+
+* Prozess-Tags: `steuerrelevant`, `ai-tag-tax`, `ai-review-tag-tax`
+* Allgemein steuerlich: `Steuern`, `steuer`, `Einkommensteuer`, `Lohnsteuer` und ähnliche
+* Weitere typische Steuer-Tags: `werbungskosten`, `arbeitsmittel`, `fortbildung`, `fachliteratur`, `homeoffice`, `arbeitszimmer`, `reisekosten`, `fahrtkosten`, `bewerbung`, `berufsverband`, `berufskleidung`
+
+**Regel für unbekannte Namen:** Tag-Namen, die `steuer` enthalten (unabhängig von Groß-/Kleinschreibung) oder klar steuerlichen Kontext beschreiben, nicht setzen.
+
+**Erlaubt** bei Steuerbescheiden und ähnlichen Dokumenten: allgemeine Tags wie `Behörde`, `wichtig`, `Finanzen` — solange der Tag-Name selbst nicht steuerlich ist.
+
+**Titel** mit Begriffen wie „Einkommensteuer“ sind erlaubt; das betrifft nur Metadaten, keine Tags.
+
 ### 9. Passende Tags auswählen
 
 Wähle Tags primär aus der bestehenden Tag-Liste.
@@ -298,7 +316,7 @@ Beispiele:
 
 * Wenn Dokumenttyp `Rechnung` ist, nicht zusätzlich ein Tag `Rechnung` setzen, außer dieses Tag existiert bereits als bewusst genutztes Prozess-Tag.
 * Bei einer Stromrechnung eher Tags wie `Wohnen`, `Strom`, `Finanzen` verwenden, sofern vorhanden.
-* Bei einem Steuerbescheid eher Tags wie `Steuern`, `Behörde`, `wichtig` verwenden, sofern vorhanden.
+* Bei einem Steuerbescheid eher allgemeine Tags wie `Behörde`, `wichtig` verwenden, sofern vorhanden. Keine steuerbezogenen Tags setzen.
 * Bei einem Vertrag eher Tags wie `Verträge`, `wichtig`, `original-aufbewahren` verwenden, sofern vorhanden.
 
 ### 10. `ai-tag-document` sicherstellen
@@ -339,7 +357,8 @@ Setze `ai-review-tag-document`, wenn mindestens einer der folgenden Fälle zutri
 * Das Datum ist unklar oder offensichtlich falsch.
 * Es besteht Duplikatverdacht.
 * Das Dokument enthält eine Frist, Mahnung, Kündigung, Zahlungsaufforderung oder einen möglichen Handlungsbedarf.
-* Das Dokument ist rechtlich, steuerlich, finanziell oder vertraglich besonders relevant.
+* Das Dokument ist rechtlich, finanziell oder vertraglich besonders relevant.
+* Steuerliche Relevanz allein ist kein Grund für `ai-review-tag-document`. Setze keine Steuer-Tags.
 * Es ist unklar, ob ein Original physisch aufbewahrt werden muss.
 * Du bist dir bei irgendeiner Einordnung nicht ausreichend sicher.
 
@@ -543,7 +562,6 @@ Tags beschreiben Thema, Kontext, Status oder Aktion.
 
 Beispiele:
 
-* Steuern
 * Finanzen
 * Wohnen
 * Auto
@@ -555,6 +573,8 @@ Beispiele:
 * offen
 * frist
 * original-aufbewahren
+
+Steuerbezogene Tags (z. B. `Steuern`, `steuerrelevant`) setzt du in diesem Prozess nicht.
 
 Wenn ein Begriff bereits als Dokumenttyp verwendet wird, lege ihn nicht zusätzlich als neues Tag an, außer das Tag existiert bereits und wird bewusst genutzt.
 
@@ -626,6 +646,7 @@ Beispiel:
 * `tag_create` niemals ohne `name` oder mit leerem Namen aufrufen.
 * Bei `document_update` das Feld `tags` als JSON-Array numerischer IDs übergeben.
 * Bei Unsicherheit lieber `ai-review-tag-document` setzen als falsch klassifizieren.
+* Keine steuerbezogenen Tags setzen oder neu anlegen.
 * Bei `correspondent_create` immer `match` und `matching_algorithm=4` setzen; `matching_algorithm=6` (Automatisch) niemals verwenden oder belassen.
 * Wenn ein Korrespondent aus der Liste zugewiesen wird, obwohl das Dokument zuvor keinen passenden Korrespondenten hatte: Regex-Nachpflege per `correspondent_update` prüfen und ggf. durchführen.
 * Antworte auf Deutsch mit einer kurzen Zusammenfassung der gesetzten Metadaten.
