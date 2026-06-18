@@ -117,7 +117,7 @@ http://<dein-server>:8081/webhook?secret=<WEBHOOK_SECRET>
 | Einstellung | Wert |
 |---|---|
 | Trigger | **Document Updated** |
-| Filter | hat Tag `ai-tag-document` **und** hat **nicht** Tag `ai-tag-tax` **und** hat **nicht** Tag `Delete` |
+| Filter | hat Tag `ai-tag-document` **und** hat **nicht** Tag `ai-tag-tax` |
 | Aktion | **Webhook** |
 
 **Webhook-URL:**
@@ -287,7 +287,7 @@ In Portainer: Stack **Pull and redeploy** (mit Rebuild).
 ### Keine Endlosschleife
 
 - **Workflow 1 (Stufe 01)** nur auf **„Document Added“** triggern, nicht auf „Document Updated“.
-- **Workflow 2 (Stufe 02)** bewusst auf **„Document Updated“** mit Filter `ai-tag-document`, ohne `ai-tag-tax` und ohne `Delete` — so startet die Steuerprüfung erst nach abgeschlossener Klassifikation und nicht für E-Mail-Duplikate zur Löschung.
+- **Workflow 2 (Stufe 02)** bewusst auf **„Document Updated“** mit Filter `ai-tag-document`, ohne `ai-tag-tax` — so startet die Steuerprüfung erst nach abgeschlossener Klassifikation.
 - Workflow 2 setzt `ai-tag-tax` und löst damit keine erneute Steuerprüfung aus.
 
 ### Job-Warteschlange
@@ -303,10 +303,6 @@ Die Queue liegt im Arbeitsspeicher — bei Container-Neustart gehen noch nicht v
 ### Deduplizierung
 
 Bereits verarbeitete Dokument-IDs werden pro Instanz für `DEDUP_TTL_HOURS` (Standard: 24 h) übersprungen. Jede Instanz hat ein eigenes Volume (`webhook-data-01-tag-document`, `webhook-data-02-tag-tax`), damit Stufe 02 nicht übersprungen wird, weil Stufe 01 dieselbe ID bereits verarbeitet hat.
-
-### E-Mail/PDF-Duplikate (Stufe 01)
-
-Beim E-Mail-Import entstehen oft zwei Dokumente mit gleichem Titel und aufeinanderfolgenden IDs (z. B. 542 + 543): die E-Mail und der PDF-Anhang. Stufe 01 prüft in Schritt 4a des Prompts `01-tag-document.md` Nachbar-IDs ±1 und markiert redundante E-Mails mit Tag `Delete` plus Notiz — ohne automatisches Löschen. Das PDF wird normal klassifiziert. Workflow 2 soll Dokumente mit Tag `Delete` ausschließen (siehe Filter oben).
 
 ### Sicherheit
 
@@ -371,7 +367,7 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 | MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver-01-tag-document paperless-ngx-mcp --version` |
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
 | Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, Workflow-Filter prüfen |
-| Steuerprüfung startet nicht | Workflow 2 auf Port `8082`, Filter `ai-tag-document` ohne `ai-tag-tax` und ohne `Delete` |
+| Steuerprüfung startet nicht | Workflow 2 auf Port `8082`, Filter `ai-tag-document` ohne `ai-tag-tax` |
 | `pip install` schlägt beim Image-Build fehl | Host braucht `linux/amd64` oder `linux/arm64` (kein 32-bit ARM). Genug Speicher/Platz für ~60 MB `cursor-sdk`-Wheel. Build-Log prüfen; bei Proxy `PIP_INDEX_URL` als Build-Arg setzen |
 
 Logs ansehen:
