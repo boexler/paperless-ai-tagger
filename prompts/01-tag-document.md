@@ -14,6 +14,7 @@ Verwende ausschließlich diese `paperless-ngx-mcp`-Tool-Namen:
 | Tag anlegen            | `tag_create`           |
 | Korrespondenten auflisten | `correspondent_list` |
 | Korrespondent anlegen  | `correspondent_create` |
+| Korrespondent aktualisieren | `correspondent_update` |
 | Dokumenttypen auflisten | `document_type_list`  |
 | Dokumenttyp anlegen    | `document_type_create` |
 | Dokument lesen         | `document_get`         |
@@ -72,6 +73,11 @@ Merke dir für jeden Korrespondenten:
 
 * numerische ID
 * Name
+* `match` (Zuordnungsmuster)
+* `matching_algorithm` (1=Any, 2=All, 3=Exact, 4=Regex, 5=Fuzzy, 6=Auto/„Automatisch“)
+* `is_insensitive`
+
+Korrespondenten mit `matching_algorithm=6` (Automatisch) oder leerem `match` gelten als noch nicht sauber für die automatische Zuordnung konfiguriert. Der Modus „Automatisch“ darf weder belassen noch neu gesetzt werden.
 
 ### 3. Dokumenttypen laden
 
@@ -183,14 +189,51 @@ Bestimme zuerst Korrespondent und Dokumenttyp, bevor du Titel und Tags festlegst
 
 #### Korrespondent
 
-1. Wenn der vorhandene Korrespondent fachlich plausibel ist, übernimm ihn.
-2. Wenn kein Korrespondent gesetzt ist oder der vorhandene wahrscheinlich falsch ist, suche in der geladenen Korrespondenten-Liste nach einem passenden Eintrag.
-3. Wähle einen bestehenden Korrespondenten, wenn der Name fachlich passt. Lege keine Duplikate mit leicht abweichender Schreibweise an.
+Merke dir zu Beginn dieses Schritts, ob der Korrespondent am Dokument **von Anfang an plausibel** war (für die Regex-Nachpflege relevant).
+
+**Auswahl-Priorität:**
+
+1. Wenn der vorhandene Korrespondent am Dokument fachlich plausibel ist, übernimm ihn. Keine Regex-Nachpflege nötig — Paperless hat bereits korrekt zugeordnet.
+2. Wenn kein Korrespondent gesetzt ist oder der vorhandene wahrscheinlich falsch ist, suche in der geladenen Korrespondenten-Liste:
+   * zuerst: Eintrag, dessen **bestehendes Regex-Muster** (`matching_algorithm=4`) den OCR-Text eindeutig trifft
+   * dann: Eintrag, dessen **Name** fachlich passt
+3. Wähle einen bestehenden Korrespondenten, wenn er passt. Lege keine Duplikate mit leicht abweichender Schreibweise an.
 4. Wenn kein passender Korrespondent existiert und du dir sehr sicher bist, lege ihn mit `correspondent_create` an.
 
-Pflichtparameter bei `correspondent_create`:
+**Pflichtparameter bei `correspondent_create`:**
 
 * `name="..."`
+* `match="..."` — Regex-Muster aus dem OCR-Text ableiten (siehe unten)
+* `matching_algorithm=4` — Regex; **niemals** `6` (Automatisch)
+* `is_insensitive=true` — Standard, außer Groß-/Kleinschreibung ist fachlich unterscheidend
+
+**Verbot:** `matching_algorithm=6` (Automatisch) oder Weglassen von `match`. Paperless darf für Korrespondenten nicht im Modus „Automatisch“ bleiben.
+
+**Regex-Muster ableiten:**
+
+* Stabile Anker aus dem OCR-Text wählen: Firmenname, Rechtsform, Markenbezeichnung, USt-IdNr., E-Mail-Domain, wiederkehrender Briefkopf-Text
+* Muster **eindeutig** halten — nicht so breit, dass mehrere Korrespondenten matchen
+* Varianten-Schreibweisen als Alternation: `Media\s*Markt|MediaMarkt`
+* `is_insensitive=true` bevorzugen, wenn nur Schreibweisen variieren
+
+**Regex-Nachpflege bei bestehenden Korrespondenten (`correspondent_update`):**
+
+Greift, wenn das Dokument **zu Beginn keinen passenden Korrespondenten** hatte (leer oder wahrscheinlich falsch) und du einen **bestehenden** Eintrag aus der Liste zuweist. Führe die Nachpflege **vor** `document_update` aus, damit künftige Paperless-Zuordnungen beim Import greifen.
+
+| Situation | Aktion |
+| --- | --- |
+| `matching_algorithm=6` oder `match` leer | `correspondent_update` mit `matching_algorithm=4` und `match` aus OCR setzen |
+| Regex vorhanden, OCR zeigt neue Schreibweise | Muster per **Alternation erweitern** (`\|`), solange eindeutig |
+| Regex passt bereits | Kein Update |
+
+**Nicht nachpflegen**, wenn der vorhandene Korrespondent am Dokument von Anfang an plausibel war.
+
+Pflichtparameter bei `correspondent_update`:
+
+* `id` — numerische ID des Korrespondenten
+* `match="..."` — neues oder erweitertes Regex-Muster
+* `matching_algorithm=4`
+* optional `is_insensitive=true`
 
 #### Dokumenttyp
 
@@ -436,6 +479,7 @@ Die Notiz muss enthalten:
 * ob der Korrespondent geändert wurde
 * falls der Korrespondent geändert wurde: alter und neuer Korrespondent
 * falls der Korrespondent nicht geändert wurde: kurze Einschätzung, ob der vorhandene Korrespondent plausibel war
+* falls `correspondent_create` oder `correspondent_update` für Match-Zwecke genutzt wurde: Hinweis „Regex angelegt/aktualisiert“ mit Kurzinfo (neues Muster oder erweiterte Variante)
 * ob der Dokumenttyp geändert wurde
 * falls der Dokumenttyp geändert wurde: alter und neuer Dokumenttyp
 * falls der Dokumenttyp nicht geändert wurde: kurze Einschätzung, ob der vorhandene Dokumenttyp plausibel war
@@ -463,7 +507,7 @@ Wenn Review nötig ist, muss die Notiz klar sagen, was ein Mensch prüfen soll.
 * Schreibe nicht den Literaltext `\n` in die Notiz — verwende echte Zeilenumbrüche.
 * Zeile 1: Überschrift `Automatische Einordnung:`
 * Folgezeilen: je ein Bullet mit `- ` pro Themenblock in dieser Reihenfolge:
-  * Korrespondent
+  * Korrespondent (inkl. Regex angelegt/aktualisiert, falls zutreffend)
   * Dokumenttyp
   * Titel
   * Tags + Begründung
@@ -476,7 +520,7 @@ Bevorzugtes Format der Notiz:
 
 ```
 Automatische Einordnung:
-- Korrespondent [geändert/nicht geändert, plausibel/unklar, ggf. alter und neuer Wert].
+- Korrespondent [geändert/nicht geändert, plausibel/unklar, ggf. alter und neuer Wert; ggf. Regex angelegt/aktualisiert: Muster].
 - Dokumenttyp [geändert/nicht geändert, plausibel/unklar, ggf. alter und neuer Wert].
 - Titel [geändert/nicht geändert, plausibel/unklar, ggf. alter und neuer Wert].
 - Tags ergänzt: [Tag-Liste]. Begründung: [kurze Begründung].
@@ -626,6 +670,8 @@ Beispiel:
 * `tag_create` niemals ohne `name` oder mit leerem Namen aufrufen.
 * Bei `document_update` das Feld `tags` als JSON-Array numerischer IDs übergeben.
 * Bei Unsicherheit lieber `ai-review-tag-document` setzen als falsch klassifizieren.
+* Bei `correspondent_create` immer `match` und `matching_algorithm=4` setzen; `matching_algorithm=6` (Automatisch) niemals verwenden oder belassen.
+* Wenn ein Korrespondent aus der Liste zugewiesen wird, obwohl das Dokument zuvor keinen passenden Korrespondenten hatte: Regex-Nachpflege per `correspondent_update` prüfen und ggf. durchführen.
 * Antworte auf Deutsch mit einer kurzen Zusammenfassung der gesetzten Metadaten.
 
 ## Antwortformat
@@ -641,11 +687,16 @@ Die Antwort soll enthalten:
 * ob `ai-review-tag-document` gesetzt wurde
 * kurze Begründung
 * Hinweis auf neu erstellte Tags, Korrespondenten oder Dokumenttypen, falls vorhanden
+* Hinweis auf neu angelegte oder regex-nachgepflegte Korrespondenten, falls vorhanden
 * bei E-Mail/PDF-Duplikat: Hinweis, ob Klassifikation übersprungen wurde oder ein Nachbar mit `Delete` markiert wurde
 
 Beispiel:
 
 `Dokument {{document_id}} wurde geprüft und aktualisiert. Korrespondent: Stadtwerke (unverändert). Dokumenttyp: Rechnung (unverändert). Ergänzte Tags: Finanzen, Wohnen, Strom, ai-tag-document. ai-review-tag-document wurde nicht gesetzt, da Titel, Korrespondent, Dokumenttyp und OCR-Inhalt plausibel zusammenpassen. Es wurden keine neuen Tags angelegt.`
+
+Beispiel mit Regex-Nachpflege:
+
+`Dokument {{document_id}} wurde geprüft und aktualisiert. Korrespondent: Stadtwerke (zugewiesen, Regex-Muster nachgepflegt). Dokumenttyp: Rechnung (unverändert). Ergänzte Tags: Finanzen, Wohnen, Strom, ai-tag-document. ai-review-tag-document wurde nicht gesetzt.`
 
 Beispiel bei E-Mail-Duplikat (Klassifikation übersprungen):
 
