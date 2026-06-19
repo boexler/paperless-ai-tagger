@@ -40,6 +40,17 @@ services:
     ports:
       - "${WEBHOOK_PORT_02:-8082}:8080"
 
+  webhook-receiver-03-tag-document-tax:
+    <<: *webhook-receiver-base
+    container_name: paperless-ai-tagger-03-tag-document-tax.md
+    environment:
+      <<: *webhook-receiver-env
+      PROMPT_TEMPLATE: 03-tag-document-tax.md
+    volumes:
+      - webhook-data-03-tag-document-tax:/data
+    ports:
+      - "${WEBHOOK_PORT_03:-8083}:8080"
+
 networks:
   paperless-ai-tagger:
     driver: bridge
@@ -47,3 +58,4 @@ networks:
 volumes:
   webhook-data-01-tag-document:
   webhook-data-02-tag-tax:
+  webhook-data-03-tag-document-tax:

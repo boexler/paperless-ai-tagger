@@ -18,9 +18,10 @@ flowchart LR
 |---|---|
 | **Paperless-ngx** | Dokumentenverwaltung, feuert Webhook bei „Document Added“ |
 | **paperless-ngx-mcp** | MCP-Server (stdio) mit Zugriff auf die Paperless-API, im webhook-receiver-Image enthalten |
-| **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK (zwei Instanzen in der Pipeline) |
+| **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK (bis zu drei Instanzen) |
 | **prompts/01-tag-document.md** | Prompt für Klassifikation: Korrespondent, Dokumenttyp, Titel, Tags (setzt `ai-tag-document`) |
 | **prompts/02-tag-tax.md** | Prompt für die nachgelagerte Steuerprüfung (setzt `ai-tag-tax`) |
+| **prompts/03-tag-document-tax.md** | Kombi-Prompt: Klassifikation + Steuerprüfung in einem Agenten-Lauf |
 
 ## Zweistufige Pipeline
 
@@ -42,7 +43,20 @@ sequenceDiagram
 
 Die Reihenfolge steuert Paperless über zwei Workflows — nicht Docker. Stufe 01 antwortet asynchron (`202`); Stufe 02 feuert erst, wenn Paperless das Update mit `ai-tag-document` meldet.
 
-**Port-Konvention:** Stufe `NN` → Host-Port `808N` (01 → 8081, 02 → 8082).
+**Port-Konvention:** Stufe `NN` → Host-Port `808N` (01 → 8081, 02 → 8082, 03 → 8083).
+
+### Ein-Stufen-Alternative (Stufe 03)
+
+Statt der Zwei-Stufen-Pipeline (01 → 02) kann **ein** Webhook auf Port `8083` Klassifikation und Steuerprüfung in einem Cursor-Agent-Lauf ausführen (`03-tag-document-tax.md`). Spart einen Agenten-Lauf pro Dokument.
+
+**Wichtig:** Pro Dokument **entweder** die Pipeline 01→02 **oder** Stufe 03 verwenden — nicht beides parallel, sonst Doppelverarbeitung.
+
+```mermaid
+flowchart LR
+    P[Paperless DocumentAdded] --> W3[03:8083]
+    W3 --> A3[Agent Klassifikation + Steuer]
+    A3 --> P2[document_update ai-tag-document + ai-tag-tax]
+```
 
 ## Voraussetzungen
 
@@ -78,18 +92,20 @@ WEBHOOK_SECRET=ein-langes-zufaelliges-secret
 docker compose up -d --build
 ```
 
-Zwei Instanzen starten automatisch:
+Drei Instanzen starten automatisch (01 und 02 für die Zwei-Stufen-Pipeline; 03 optional als Ein-Stufen-Alternative):
 
 | Instanz | Container | Port | Prompt |
 |---|---|---|---|
 | Klassifikation (Stufe 01) | `paperless-ai-tagger-01-tag-document.md` | `8081` (`WEBHOOK_PORT_01`) | `01-tag-document.md` |
 | Steuerprüfung (Stufe 02) | `paperless-ai-tagger-02-tag-tax.md` | `8082` (`WEBHOOK_PORT_02`) | `02-tag-tax.md` |
+| Kombi (Stufe 03) | `paperless-ai-tagger-03-tag-document-tax.md` | `8083` (`WEBHOOK_PORT_03`) | `03-tag-document-tax.md` |
 
 Healthcheck:
 
 ```bash
 curl http://localhost:8081/health
 curl http://localhost:8082/health
+curl http://localhost:8083/health
 ```
 
 ### 3. Paperless-Workflows einrichten
@@ -125,6 +141,24 @@ http://<dein-server>:8081/webhook?secret=<WEBHOOK_SECRET>
 ```
 http://<dein-server>:8082/webhook?secret=<WEBHOOK_SECRET>
 ```
+
+#### Workflow 3 — Kombi (Stufe 03, Ein-Stufen-Alternative)
+
+Alternative zu Workflow 1 + 2: ein Agent für Klassifikation und Steuerprüfung.
+
+| Einstellung | Wert |
+|---|---|
+| Trigger | **Document Added** |
+| Filter | optional: Dokument hat **nicht** Tag `ai-tag-document` |
+| Aktion | **Webhook** |
+
+**Webhook-URL:**
+
+```
+http://<dein-server>:8083/webhook?secret=<WEBHOOK_SECRET>
+```
+
+Wenn Stufe 03 aktiv ist, Workflow 1 und 2 für dieselben Dokumente deaktivieren oder per Tag-Filter trennen.
 
 Wenn Paperless im selben Docker-Netzwerk läuft, die interne Service-URL verwenden und `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS=true` setzen.
 
@@ -172,7 +206,8 @@ paperless-ai-tagger/
 ├── .env.example
 ├── prompts/
 │   ├── 01-tag-document.md        # Prompt: Klassifikation (Korrespondent, Typ, Titel, Tags)
-│   └── 02-tag-tax.md             # Prompt: Steuerrelevanz-Prüfung
+│   ├── 02-tag-tax.md             # Prompt: Steuerrelevanz-Prüfung
+│   └── 03-tag-document-tax.md    # Prompt: Kombi Klassifikation + Steuer
 ├── config/
 │   └── mcp.json.example        # Referenz (SDK nutzt inline MCP-Config)
 ├── services/
@@ -302,14 +337,14 @@ Die Queue liegt im Arbeitsspeicher — bei Container-Neustart gehen noch nicht v
 
 ### Deduplizierung
 
-Bereits verarbeitete Dokument-IDs werden pro Instanz für `DEDUP_TTL_HOURS` (Standard: 24 h) übersprungen. Jede Instanz hat ein eigenes Volume (`webhook-data-01-tag-document`, `webhook-data-02-tag-tax`), damit Stufe 02 nicht übersprungen wird, weil Stufe 01 dieselbe ID bereits verarbeitet hat.
+Bereits verarbeitete Dokument-IDs werden pro Instanz für `DEDUP_TTL_HOURS` (Standard: 24 h) übersprungen. Jede Instanz hat ein eigenes Volume (`webhook-data-01-tag-document`, `webhook-data-02-tag-tax`, `webhook-data-03-tag-document-tax`), damit parallele Pipelines sich nicht gegenseitig Dedup-Einträge teilen.
 
 ### Sicherheit
 
 - **Paperless-API-Token** liegt im webhook-receiver-Container (für stdio-MCP) – nur im internen Netz betreiben.
 - **Webhook-Secret** lang und zufällig wählen.
 - Paperless-API-Token mit minimalen Rechten (eigener User).
-- `WEBHOOK_PORT_01` / `WEBHOOK_PORT_02` nur nach Bedarf nach außen exposen; Reverse Proxy mit TLS empfohlen.
+- `WEBHOOK_PORT_01` / `WEBHOOK_PORT_02` / `WEBHOOK_PORT_03` nur nach Bedarf nach außen exposen; Reverse Proxy mit TLS empfohlen.
 
 ### Kosten
 
@@ -352,6 +387,7 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 | `WEBHOOK_SECRET` | ja | Secret für Webhook-Authentifizierung |
 | `WEBHOOK_PORT_01` | nein | Port für Klassifikation / Stufe 01 (Standard: `8081`) |
 | `WEBHOOK_PORT_02` | nein | Port für Steuerprüfung / Stufe 02 (Standard: `8082`) |
+| `WEBHOOK_PORT_03` | nein | Port für Kombi Klassifikation + Steuer / Stufe 03 (Standard: `8083`) |
 | `PROMPT_TEMPLATE` | nein | Prompt-Dateiname unter `prompts/` (Standard: `01-tag-document.md`) |
 | `PROMPT_TEMPLATE_PATH` | nein | Voller Pfad zum Prompt (überschreibt `PROMPT_TEMPLATE`) |
 | `PAPERLESS_MCP_COMMAND` | nein | Pfad zum MCP-Binary (Standard: `/usr/local/bin/paperless-ngx-mcp`) |
@@ -370,6 +406,7 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
 | Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, Workflow-Filter prüfen |
 | Steuerprüfung startet nicht | Workflow 2 auf Port `8082`, Filter `ai-tag-document` ohne `ai-tag-tax` |
+| Doppelte Verarbeitung | Pro Dokument nur Pipeline 01→02 **oder** Stufe 03; Workflow-Filter prüfen |
 | `pip install` schlägt beim Image-Build fehl | Host braucht `linux/amd64` oder `linux/arm64` (kein 32-bit ARM). Genug Speicher/Platz für ~60 MB `cursor-sdk`-Wheel. Build-Log prüfen; bei Proxy `PIP_INDEX_URL` als Build-Arg setzen |
 
 Logs ansehen:
@@ -377,6 +414,7 @@ Logs ansehen:
 ```bash
 docker compose logs -f webhook-receiver-01-tag-document
 docker compose logs -f webhook-receiver-02-tag-tax
+docker compose logs -f webhook-receiver-03-tag-document-tax
 ```
 
 ## Breaking Changes (Migration)
