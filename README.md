@@ -347,6 +347,7 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 | `PAPERLESS_API_TOKEN` | ja | API-Token für Paperless (Alias: `PAPERLESS_TOKEN`) |
 | `CURSOR_API_KEY` | ja | Cursor API Key |
 | `CURSOR_MODEL` | nein | Modell (Standard: `composer-2.5`) |
+| `CURSOR_LIST_MODELS_ON_STARTUP` | nein | Beim Start alle verfügbaren Cursor-Modelle inkl. Parameter loggen (Standard: `false`) |
 | `WEBHOOK_SECRET` | ja | Secret für Webhook-Authentifizierung |
 | `WEBHOOK_PORT_01` | nein | Port für Klassifikation / Stufe 01 (Standard: `8081`) |
 | `WEBHOOK_PORT_02` | nein | Port für Steuerprüfung / Stufe 02 (Standard: `8082`) |

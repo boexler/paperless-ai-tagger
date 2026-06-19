@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from app.config import Settings, settings
+from app.cursor_catalog import log_available_cursor_models
 from app.dedup import ProcessedDocumentStore
 from app.job_queue import TaggingJobQueue
 from app.models import WebhookPayload, extract_document_id
@@ -26,6 +27,9 @@ def create_store(app_settings: Settings) -> ProcessedDocumentStore:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.cursor_list_models_on_startup:
+        log_available_cursor_models(settings.cursor_api_key)
+
     app.state.settings = settings
     app.state.store = create_store(settings)
     app.state.tagger = DocumentTagger(settings)

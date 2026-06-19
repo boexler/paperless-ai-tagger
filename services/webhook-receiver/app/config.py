@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     webhook_secret: str = Field(validation_alias="WEBHOOK_SECRET")
     cursor_api_key: str = Field(validation_alias="CURSOR_API_KEY")
     cursor_model: str = Field(default="composer-2.5", validation_alias="CURSOR_MODEL")
+    cursor_list_models_on_startup: bool = Field(
+        default=False,
+        validation_alias="CURSOR_LIST_MODELS_ON_STARTUP",
+    )
     paperless_url: str = Field(
         validation_alias=AliasChoices("PAPERLESS_URL", "PAPERLESS_BASE_URL"),
     )
