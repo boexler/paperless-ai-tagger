@@ -5,6 +5,7 @@ from pathlib import Path
 from cursor_sdk import Agent, AgentOptions, CursorAgentError, LocalAgentOptions, StdioMcpServerConfig
 
 from app.config import Settings
+from app.model_params import build_cursor_model_selection
 
 logger = logging.getLogger(__name__)
 
@@ -101,7 +102,10 @@ class DocumentTagger:
     def _build_agent_options(self) -> AgentOptions:
         return AgentOptions(
             api_key=self.settings.cursor_api_key,
-            model=self.settings.cursor_model,
+            model=build_cursor_model_selection(
+                self.settings.cursor_model,
+                self.settings.cursor_model_params,
+            ),
             local=LocalAgentOptions(
                 cwd=self.settings.agent_cwd,
                 setting_sources=[],

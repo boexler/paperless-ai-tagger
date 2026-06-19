@@ -1,5 +1,7 @@
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from app.model_params import parse_cursor_model_params
 
 DEFAULT_PROMPT_TEMPLATE = "01-tag-document.md"
 DOCKER_PROMPTS_DIR = "/app/prompts"
@@ -11,6 +13,10 @@ class Settings(BaseSettings):
     webhook_secret: str = Field(validation_alias="WEBHOOK_SECRET")
     cursor_api_key: str = Field(validation_alias="CURSOR_API_KEY")
     cursor_model: str = Field(default="composer-2.5", validation_alias="CURSOR_MODEL")
+    cursor_model_params: str = Field(
+        default="fast:false",
+        validation_alias="CURSOR_MODEL_PARAMS",
+    )
     cursor_list_models_on_startup: bool = Field(
         default=False,
         validation_alias="CURSOR_LIST_MODELS_ON_STARTUP",
@@ -38,6 +44,13 @@ class Settings(BaseSettings):
     max_concurrent_jobs: int = Field(default=1, validation_alias="MAX_CONCURRENT_JOBS")
     data_dir: str = Field(default="/data", validation_alias="DATA_DIR")
     agent_cwd: str = Field(default="/app", validation_alias="AGENT_CWD")
+
+    @field_validator("cursor_model_params")
+    @classmethod
+    def validate_cursor_model_params(cls, value: str) -> str:
+        """Reject malformed CURSOR_MODEL_PARAMS at startup."""
+        parse_cursor_model_params(value)
+        return value
 
     @model_validator(mode="after")
     def resolve_prompt_template_path(self) -> "Settings":

@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import Settings, settings
 from app.cursor_catalog import log_available_cursor_models
+from app.model_params import format_cursor_model_selection
 from app.dedup import ProcessedDocumentStore
 from app.job_queue import TaggingJobQueue
 from app.models import WebhookPayload, extract_document_id
@@ -38,7 +39,8 @@ async def lifespan(app: FastAPI):
     await job_queue.start()
     app.state.job_queue = job_queue
     logger.info(
-        "Webhook receiver started (prompt: %s, path: %s, max_concurrent_jobs: %s)",
+        "Webhook receiver started (model: %s, prompt: %s, path: %s, max_concurrent_jobs: %s)",
+        format_cursor_model_selection(settings.cursor_model, settings.cursor_model_params),
         settings.prompt_template,
         settings.prompt_template_path,
         settings.max_concurrent_jobs,

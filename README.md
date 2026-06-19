@@ -203,7 +203,7 @@ Kernlogik in `services/webhook-receiver/app/tagger.py`:
 ```python
 AgentOptions(
     api_key=settings.cursor_api_key,
-    model=settings.cursor_model,
+    model=build_cursor_model_selection(settings.cursor_model, settings.cursor_model_params),
     local=LocalAgentOptions(cwd="/app", setting_sources=[]),
     mcp_servers={
         "paperless": StdioMcpServerConfig(
@@ -347,6 +347,7 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 | `PAPERLESS_API_TOKEN` | ja | API-Token für Paperless (Alias: `PAPERLESS_TOKEN`) |
 | `CURSOR_API_KEY` | ja | Cursor API Key |
 | `CURSOR_MODEL` | nein | Modell (Standard: `composer-2.5`) |
+| `CURSOR_MODEL_PARAMS` | nein | Modell-Parameter als `key:value,key:value` (Standard: `fast:false`; bei anderen Modellen ggf. leer setzen) |
 | `CURSOR_LIST_MODELS_ON_STARTUP` | nein | Beim Start alle verfügbaren Cursor-Modelle inkl. Parameter loggen (Standard: `false`) |
 | `WEBHOOK_SECRET` | ja | Secret für Webhook-Authentifizierung |
 | `WEBHOOK_PORT_01` | nein | Port für Klassifikation / Stufe 01 (Standard: `8081`) |
