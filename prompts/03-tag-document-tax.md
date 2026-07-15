@@ -209,6 +209,10 @@ Nicht als Standard-Steuer-Tag: `berufskleidung`.
 
 ### B.4 Steuerliche Relevanz bewerten
 
+#### Transport (Lehrkraft)
+
+Gegenstände zum Transport/Organisation von Unterrichtsmaterial oder Dienstgeräten sind potenzielle Arbeitsmittel. Notebookfach = zusätzlicher Hinweis, keine Voraussetzung. Mode-/Reise-Optik schließt berufliche Nutzung nicht aus. Plausibel → `steuerrelevant` + `arbeitsmittel` (+ `schule`, `pädagogik`); unsicher → `ai-review-tag-tax`. Nicht ablehnen mit „nur Tasche“/„nur Notebookfach“. Eher privat: reines Reise-/Modeprodukt ohne Schul-/Arbeitsbezug.
+
 #### A — Steuerlich relevant → `steuerrelevant`
 
 Typische Fälle:
@@ -240,6 +244,7 @@ Typische Fälle:
 * Rechtliche/steuerliche/finanzielle Themen, konkreter Bezug unklar
 * Betrag oder Artikel nicht lesbar; Dokumenttyp passt nicht zum Inhalt
 * Kleidung/Schuhe/Textilien möglicherweise beruflich, steuerlich nicht eindeutig
+* Transportmittel für Unterrichtsmaterial — beruflicher Zweck plausibel, Beleg unklar
 * Kein Steuerbezug erkennbar, Dokumenttyp soll künftig nachgeschärft werden
 
 #### C — Kein klarer Steuerbezug
@@ -280,6 +285,7 @@ Tags: `softwareentwicklung`, `edv`, `arbeitsmittel`, `fortbildung`, `fachliterat
 Potenziell steuerlich relevante Hinweise:
 
 * **Allgemein:** Unterrichtsmaterial, Lehrmittel, Schulbücher, Fachbücher, Arbeitshefte, Lernkarten, Lernspiele, Förder-/Inklusionsmaterial, DaZ-Material, Poster, Stempel, Whiteboard-/Tafelmaterial, Laminiergerät, Toner, Druckerpapier, Ordner, Planer, Lehrerkalender, Stifte, Marker
+* **Transport:** Taschen, Rucksäcke, Koffer, Organizer, Transportboxen, Einkaufstrolleys u. Ä. zum Transport/Organisation von Unterrichtsmaterial, Lehrmitteln, Heften, Planern, Korrekturen, Dienst-Laptop/Tablet — auch mit Notebook-/Laptop-/Tablet-Fach.
 * **Deutsch:** Fibeln, Lesespiele, Silbenmaterial, Anlautkarten, Rechtschreibmaterial, Klassenlektüre
 * **Mathematik:** Rechenrahmen, Rechenplättchen, Steckwürfel, Geometriekörper, Zahlenstrahl, Einmaleins-Material, Uhrzeit-/Geld-Material
 * **Sachunterricht:** Experimentiermaterial, Mikroskop, Lupen, Magnetismus-Material, Stromkreis-Bausatz, Globus, Wetterstation, Verkehrserziehungsmaterial
@@ -303,7 +309,8 @@ Tags: `schule`, `pädagogik`, `unterrichtsmaterial`, `arbeitsmittel`, `fortbildu
 5. Optionale Tags nur wenn existierend oder eindeutig wiederverwendbar.
 6. Gemischte Nutzung → `steuerrelevant` wenn plausibel + `ai-review-tag-tax` für Aufteilung.
 7. Kleidung/Textilien → nicht automatisch `steuerrelevant`; Schutzbezug nur vorsichtig + Review.
-8. Fristen/Mahnungen nur steuerlich relevant, wenn Steuerbezug möglich.
+8. Transportmittel (Tasche, Rucksack, Koffer, Organizer …)? → Regel „Transport (Lehrkraft)“; plausibel `steuerrelevant` + `arbeitsmittel`, sonst mindestens `ai-review-tag-tax`.
+9. Fristen/Mahnungen nur steuerlich relevant, wenn Steuerbezug möglich.
 
 ---
 
