@@ -150,5 +150,69 @@ class CodexExecCommandTests(unittest.TestCase):
         self.assertEqual(command[-1], "-")
 
 
+class CodexOutputParsingTests(unittest.TestCase):
+    """Validate Codex JSON event parsing and logging."""
+
+    def _provider(self) -> CodexAgentProvider:
+        with patch.dict(
+            os.environ,
+            _env(AGENT_PROVIDER="codex", CODEX_API_KEY="sk-test"),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+            return CodexAgentProvider(settings)
+
+    def test_parse_current_mcp_tool_call_event(self) -> None:
+        provider = self._provider()
+        stdout = "\n".join(
+            [
+                '{"type":"turn.started"}',
+                (
+                    '{"type":"item.completed","item":{"type":"mcp_tool_call",'
+                    '"server":"paperless","name":"update_document","status":"completed",'
+                    '"arguments":{"document_id":1028},"output":"updated"}}'
+                ),
+                (
+                    '{"type":"item.completed","item":{"type":"assistant_message",'
+                    '"content":[{"type":"text","text":"Document 1028 updated."}]}}'
+                ),
+            ],
+        )
+
+        with self.assertLogs("app.providers.codex", level="INFO") as logs:
+            summary, error, tool_errors, event_count, tool_count = provider._parse_codex_output(
+                1028,
+                stdout,
+                "",
+            )
+
+        self.assertEqual(summary, "Document 1028 updated.")
+        self.assertIsNone(error)
+        self.assertEqual(tool_errors, [])
+        self.assertEqual(event_count, 3)
+        self.assertEqual(tool_count, 1)
+        self.assertIn("Agent tool paperless.update_document", "\n".join(logs.output))
+
+    def test_parse_current_mcp_tool_call_error(self) -> None:
+        provider = self._provider()
+        stdout = (
+            '{"type":"item.completed","item":{"type":"mcp_tool_call",'
+            '"server":"paperless","name":"update_document","status":"error",'
+            '"output":"permission denied"}}'
+        )
+
+        summary, error, tool_errors, event_count, tool_count = provider._parse_codex_output(
+            1028,
+            stdout,
+            "",
+        )
+
+        self.assertIsNone(summary)
+        self.assertEqual(error, "paperless.update_document: permission denied")
+        self.assertEqual(tool_errors, ["paperless.update_document: permission denied"])
+        self.assertEqual(event_count, 1)
+        self.assertEqual(tool_count, 1)
+
+
 if __name__ == "__main__":
     unittest.main()

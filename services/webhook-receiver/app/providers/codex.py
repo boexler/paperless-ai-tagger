@@ -89,24 +89,59 @@ class CodexAgentProvider:
                 return "\n".join(parts)
         return None
 
+    def _extract_tool_event(self, event: dict[str, Any]) -> dict[str, Any] | None:
+        """Return a normalized tool event from current and older Codex JSON shapes."""
+        event_type = str(event.get("type", "")).lower()
+        if event_type in {"tool_call", "tool_result", "tool"}:
+            return event
+
+        item = event.get("item")
+        if not isinstance(item, dict):
+            return None
+
+        item_type = str(item.get("type", "")).lower()
+        if item_type not in {"tool_call", "tool_result", "tool", "mcp_tool_call"}:
+            return None
+
+        normalized = dict(item)
+        if "status" not in normalized and event_type.endswith(".completed"):
+            normalized["status"] = "completed"
+        return normalized
+
     def _log_codex_event(self, document_id: int, event: dict[str, Any]) -> str | None:
         """Log one Codex JSON event and return an error summary when present."""
         event_type = str(event.get("type", "")).lower()
-        text = self._extract_text(event)
+        item = event.get("item")
+        item_type = str(item.get("type", "")).lower() if isinstance(item, dict) else ""
+        text = self._extract_text(item) or self._extract_text(event)
 
-        if event_type in {"assistant", "agent_message", "message"} and text:
+        if (
+            event_type in {"assistant", "agent_message", "message"}
+            or item_type in {"assistant_message", "message"}
+        ) and text:
             logger.info("Agent assistant (document %s): %s", document_id, self._truncate_for_log(text))
             return None
 
-        if event_type in {"thinking", "reasoning"} and text:
+        if (
+            event_type in {"thinking", "reasoning"}
+            or item_type in {"reasoning", "thinking"}
+        ) and text:
             logger.info("Agent thinking (document %s): %s", document_id, self._truncate_for_log(text))
             return None
 
-        if event_type in {"tool_call", "tool_result", "tool"}:
-            name = event.get("name") or event.get("tool") or "?"
-            status = str(event.get("status", "completed")).lower()
-            args = self._truncate_for_log(event.get("args", event.get("arguments", "")))
-            result = self._truncate_for_log(event.get("result", text or ""))
+        tool_event = self._extract_tool_event(event)
+        if tool_event is not None:
+            server = tool_event.get("server") or tool_event.get("server_name")
+            name = tool_event.get("name") or tool_event.get("tool") or "?"
+            if server:
+                name = f"{server}.{name}"
+            status = str(tool_event.get("status", "completed")).lower()
+            args = self._truncate_for_log(
+                tool_event.get("args", tool_event.get("arguments", "")),
+            )
+            result = self._truncate_for_log(
+                tool_event.get("result", tool_event.get("output", text or "")),
+            )
             logger.info(
                 "Agent tool %s (document %s) status=%s args=%s result=%s",
                 name,
@@ -131,11 +166,13 @@ class CodexAgentProvider:
         document_id: int,
         stdout: str,
         stderr: str,
-    ) -> tuple[str | None, str | None, list[str]]:
-        """Parse codex exec output and return summary, error, and tool errors."""
+    ) -> tuple[str | None, str | None, list[str], int, int]:
+        """Parse codex exec output and return summary, error, tool errors, counts."""
         summary: str | None = None
         error: str | None = None
         tool_errors: list[str] = []
+        event_count = 0
+        tool_count = 0
 
         for line in stdout.splitlines():
             stripped = line.strip()
@@ -149,13 +186,24 @@ class CodexAgentProvider:
             if not isinstance(event, dict):
                 continue
 
+            event_count += 1
+            logger.debug("Codex raw event (document %s): %s", document_id, stripped)
+
+            if self._extract_tool_event(event) is not None:
+                tool_count += 1
+
             tool_error = self._log_codex_event(document_id, event)
             if tool_error:
                 tool_errors.append(tool_error)
 
             event_type = str(event.get("type", "")).lower()
-            text = self._extract_text(event)
-            if event_type in {"result", "final", "completed", "agent_message", "assistant"} and text:
+            item = event.get("item")
+            item_type = str(item.get("type", "")).lower() if isinstance(item, dict) else ""
+            text = self._extract_text(item) or self._extract_text(event)
+            if (
+                event_type in {"result", "final", "completed", "agent_message", "assistant"}
+                or item_type in {"assistant_message", "message"}
+            ) and text:
                 summary = text
             if event_type in {"error", "run_error"}:
                 error = text or "Codex run failed"
@@ -165,7 +213,7 @@ class CodexAgentProvider:
 
         if not error and tool_errors:
             error = "; ".join(tool_errors)
-        return summary, error, tool_errors
+        return summary, error, tool_errors, event_count, tool_count
 
     def tag_document(
         self,
@@ -211,7 +259,7 @@ class CodexAgentProvider:
                 error=str(exc),
             )
 
-        summary, error, _tool_errors = self._parse_codex_output(
+        summary, error, _tool_errors, event_count, tool_count = self._parse_codex_output(
             document_id,
             completed.stdout,
             completed.stderr,
@@ -239,6 +287,18 @@ class CodexAgentProvider:
                 "Agent summary (document %s): %s",
                 document_id,
                 self._truncate_for_log(summary),
+            )
+        if event_count == 0:
+            logger.warning(
+                "Codex agent produced no JSON events for document %s (run_id=%s)",
+                document_id,
+                run_id,
+            )
+        elif tool_count == 0:
+            logger.warning(
+                "Codex agent finished without any tool calls for document %s (run_id=%s)",
+                document_id,
+                run_id,
             )
         logger.info("Codex agent finished for document %s (run_id=%s)", document_id, run_id)
         return TaggingResult(
