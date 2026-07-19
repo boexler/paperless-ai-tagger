@@ -2,14 +2,14 @@
 
 Automatisches Taggen von [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx)-Dokumenten per KI.
 
-Wenn in Paperless ein neues Dokument hinzukommt, feuert ein Workflow-Webhook diesen Dienst. Der Webhook-Receiver startet einen Cursor-Agenten über das **Cursor SDK** mit [paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) und lässt das Dokument automatisch taggen.
+Wenn in Paperless ein neues Dokument hinzukommt, feuert ein Workflow-Webhook diesen Dienst. Der Webhook-Receiver startet einen KI-Agenten (**Cursor SDK** oder **OpenAI Codex CLI**) mit [paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) und lässt das Dokument automatisch taggen. Der Provider wird über `AGENT_PROVIDER` gewählt.
 
 ## Architektur
 
 ```mermaid
 flowchart LR
     P[Paperless-ngx] -->|Workflow Webhook| W[webhook-receiver]
-    W -->|Cursor SDK| A[Cursor Agent]
+    W -->|Cursor SDK oder Codex CLI| A[KI-Agent]
     A -->|stdio MCP| M[paperless-ngx-mcp]
     M -->|REST API| P
 ```
@@ -18,7 +18,7 @@ flowchart LR
 |---|---|
 | **Paperless-ngx** | Dokumentenverwaltung, feuert Webhook bei „Document Added“ |
 | **paperless-ngx-mcp** | MCP-Server (stdio) mit Zugriff auf die Paperless-API, im webhook-receiver-Image enthalten |
-| **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK (bis zu drei Instanzen) |
+| **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK oder Codex CLI (bis zu drei Instanzen) |
 | **prompts/01-tag-document.md** | Prompt für Klassifikation: Korrespondent, Dokumenttyp, Titel, Tags (setzt `ai-tag-document`) |
 | **prompts/02-tag-tax.md** | Prompt für die nachgelagerte Steuerprüfung (setzt `ai-tag-tax`) |
 | **prompts/03-tag-document-tax.md** | Kombi-Prompt: Klassifikation + Steuerprüfung in einem Agenten-Lauf |
@@ -62,7 +62,8 @@ flowchart LR
 
 - Docker und Docker Compose auf einem Headless-Server
 - Laufende Paperless-ngx-Instanz mit API-Token
-- [Cursor API Key](https://cursor.com/dashboard/integrations) (`CURSOR_API_KEY`)
+- **Cursor:** [Cursor API Key](https://cursor.com/dashboard/integrations) (`CURSOR_API_KEY`) bei `AGENT_PROVIDER=cursor`
+- **Codex:** OpenAI API Key (`OPENAI_API_KEY` oder `CODEX_API_KEY`) bei `AGENT_PROVIDER=codex`
 - Paperless: `PAPERLESS_URL` gesetzt (für `{{doc_url}}` im Webhook)
 
 ## Schnellstart
@@ -80,8 +81,18 @@ cp .env.example .env
 ```env
 PAPERLESS_BASE_URL=https://paperless.deine-domain.de
 PAPERLESS_API_TOKEN=dein-api-token
+AGENT_PROVIDER=cursor
 CURSOR_API_KEY=cursor_dein_api_key
 WEBHOOK_SECRET=ein-langes-zufaelliges-secret
+```
+
+Für Codex statt Cursor:
+
+```env
+AGENT_PROVIDER=codex
+OPENAI_API_KEY=sk-dein-openai-key
+CODEX_MODEL=gpt-5.4-mini
+CODEX_REASONING_EFFORT=low
 ```
 
 > **Image-Version:** Das `paperless-ngx-mcp`-Binary wird beim Image-Build aus [freeformz/paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) übernommen. Version in `services/webhook-receiver/Dockerfile` anpassen.
@@ -217,7 +228,9 @@ paperless-ai-tagger/
 │       └── app/
 │           ├── main.py         # Webhook-Endpunkte
 │           ├── job_queue.py    # Begrenzte Job-Warteschlange
-│           ├── tagger.py       # Cursor SDK Integration
+│           ├── tagger.py       # Provider-Fassade (Cursor/Codex)
+│           ├── providers/      # Cursor SDK + Codex CLI Backends
+│           ├── codex_config.py # Codex config.toml Generator
 │           ├── config.py       # Umgebungsvariablen
 │           ├── models.py       # Payload-Modelle
 │           └── dedup.py        # Deduplizierung
@@ -225,15 +238,26 @@ paperless-ai-tagger/
     └── smoke-test.sh
 ```
 
-## Cursor SDK
+## Agent-Provider
 
-Der Dienst nutzt das [Cursor Python SDK](https://cursor.com/docs/sdk/python) (`cursor-sdk`), nicht die CLI. Vorteile:
+Der Dienst unterstützt zwei Backends, umschaltbar per `AGENT_PROVIDER`:
+
+| Provider | Wert | Integration | Modell / Aufwand |
+|---|---|---|---|
+| **Cursor** (Standard) | `cursor` | [Cursor Python SDK](https://cursor.com/docs/sdk/python) | `CURSOR_MODEL`, `CURSOR_MODEL_PARAMS` (z. B. `fast:true` für günstiger) |
+| **Codex** | `codex` | [OpenAI Codex CLI](https://developers.openai.com/codex/) (`codex exec`) | `CODEX_MODEL`, `CODEX_REASONING_EFFORT` (`minimal`/`low`/`medium`/`high`/`xhigh`) |
+
+Beide Provider nutzen `paperless-ngx-mcp` als stdio-MCP-Server für Paperless-API-Zugriff.
+
+### Cursor SDK
+
+Der Cursor-Provider nutzt das Cursor Python SDK (`cursor-sdk`), nicht die CLI. Vorteile:
 
 - Sauberes Error-Handling (`CursorAgentError` vs. `result.status == "error"`)
 - Inline MCP-Konfiguration ohne `mcp.json` im Container
 - Automatisches Cleanup nach `Agent.prompt()`
 
-Kernlogik in `services/webhook-receiver/app/tagger.py`:
+Kernlogik in `services/webhook-receiver/app/providers/cursor.py`:
 
 ```python
 AgentOptions(
@@ -253,7 +277,21 @@ AgentOptions(
 )
 ```
 
-`paperless-ngx-mcp` spricht **stdio-MCP** (kein HTTP-Port). Der Cursor-Agent startet den Prozess als Subprozess im webhook-receiver-Container.
+### Codex CLI
+
+Der Codex-Provider startet `codex exec` im Container (non-interactive). Beim Start wird `$CODEX_HOME/config.toml` mit Paperless-MCP und Sandbox-Einstellungen generiert.
+
+Typische günstige Einstellung:
+
+```env
+AGENT_PROVIDER=codex
+CODEX_MODEL=gpt-5.4-mini
+CODEX_REASONING_EFFORT=low
+CODEX_MODEL_VERBOSITY=low
+CODEX_NETWORK_ACCESS=true
+```
+
+`CODEX_NETWORK_ACCESS=true` ist nötig, damit Codex die Paperless-API über MCP erreichen kann.
 
 ### Lokale Entwicklung (ohne Docker)
 
@@ -274,11 +312,17 @@ Umgebungsvariablen:
 
 ```bash
 export WEBHOOK_SECRET=test
+export AGENT_PROVIDER=cursor
 export CURSOR_API_KEY=cursor_...
 export PAPERLESS_BASE_URL=http://localhost:8000
 export PAPERLESS_API_TOKEN=dein-token
 export PAPERLESS_MCP_COMMAND=$HOME/go/bin/paperless-ngx-mcp   # Windows: Pfad anpassen
 export PROMPT_TEMPLATE_PATH=../../prompts/01-tag-document.md
+
+# Codex lokal:
+# export AGENT_PROVIDER=codex
+# export OPENAI_API_KEY=sk-...
+# export CODEX_COMMAND=codex
 
 uvicorn app.main:app --reload --port 8081
 ```
@@ -348,7 +392,13 @@ Bereits verarbeitete Dokument-IDs werden pro Instanz für `DEDUP_TTL_HOURS` (Sta
 
 ### Kosten
 
-Jedes neue Dokument löst einen Cursor-Agent-Lauf aus. Bei vielen Uploads Kosten und Rate Limits beachten.
+Jedes neue Dokument löst einen Agenten-Lauf aus (Cursor oder Codex). Bei vielen Uploads Kosten und Rate Limits beachten.
+
+| Ziel | Cursor | Codex |
+|---|---|---|
+| möglichst günstig | `CURSOR_MODEL_PARAMS=fast:true` | `CODEX_MODEL=gpt-5.4-mini`, `CODEX_REASONING_EFFORT=low` |
+| ausgewogen | `fast:false` | `CODEX_MODEL=gpt-5.4`, `CODEX_REASONING_EFFORT=medium` |
+| maximale Qualität | `fast:false` | `CODEX_REASONING_EFFORT=high` |
 
 ### OCR-Timing
 
@@ -380,10 +430,20 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 |---|---|---|
 | `PAPERLESS_BASE_URL` | ja | URL der Paperless-Instanz (Alias: `PAPERLESS_URL`) |
 | `PAPERLESS_API_TOKEN` | ja | API-Token für Paperless (Alias: `PAPERLESS_TOKEN`) |
-| `CURSOR_API_KEY` | ja | Cursor API Key |
-| `CURSOR_MODEL` | nein | Modell (Standard: `composer-2.5`) |
-| `CURSOR_MODEL_PARAMS` | nein | Modell-Parameter als `key:value,key:value` (Standard: `fast:false`; bei anderen Modellen ggf. leer setzen) |
-| `CURSOR_LIST_MODELS_ON_STARTUP` | nein | Beim Start alle verfügbaren Cursor-Modelle inkl. Parameter loggen (Standard: `false`) |
+| `AGENT_PROVIDER` | nein | Agent-Backend: `cursor` (Standard) oder `codex` |
+| `CURSOR_API_KEY` | bei `cursor` | Cursor API Key |
+| `CURSOR_MODEL` | nein | Cursor-Modell (Standard: `composer-2.5`) |
+| `CURSOR_MODEL_PARAMS` | nein | Cursor-Parameter als `key:value,key:value` (Standard: `fast:false`) |
+| `CURSOR_LIST_MODELS_ON_STARTUP` | nein | Beim Start Cursor-Modelle loggen (Standard: `false`) |
+| `OPENAI_API_KEY` | bei `codex` | OpenAI API Key (Alias: `CODEX_API_KEY`) |
+| `CODEX_MODEL` | nein | Codex-Modell (Standard: `gpt-5.4-mini`) |
+| `CODEX_REASONING_EFFORT` | nein | Codex-Aufwand: `minimal`/`low`/`medium`/`high`/`xhigh` (Standard: `low`) |
+| `CODEX_MODEL_VERBOSITY` | nein | Codex-Ausgabe: `low`/`medium`/`high` (Standard: `low`) |
+| `CODEX_APPROVAL_POLICY` | nein | Codex-Freigaben (Standard: `never`) |
+| `CODEX_SANDBOX` | nein | Codex-Sandbox (Standard: `workspace-write`) |
+| `CODEX_NETWORK_ACCESS` | nein | Netzwerk in Sandbox (Standard: `true`, für Paperless-API) |
+| `CODEX_COMMAND` | nein | Pfad zur Codex-CLI (Standard: `codex`) |
+| `CODEX_HOME` | nein | Codex-Konfigurationsverzeichnis (Standard: `/data/codex`) |
 | `WEBHOOK_SECRET` | ja | Secret für Webhook-Authentifizierung |
 | `WEBHOOK_PORT_01` | nein | Port für Klassifikation / Stufe 01 (Standard: `8081`) |
 | `WEBHOOK_PORT_02` | nein | Port für Steuerprüfung / Stufe 02 (Standard: `8082`) |
@@ -401,7 +461,7 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 |---|---|
 | `doc_url` leer im Webhook | `PAPERLESS_URL` in Paperless setzen |
 | `401 Invalid webhook secret` | Secret in URL/Header und `.env` abgleichen |
-| Agent startet nicht | `CURSOR_API_KEY` prüfen, Logs: `docker compose logs -f` |
+| Agent startet nicht | Bei `cursor`: `CURSOR_API_KEY` prüfen. Bei `codex`: `OPENAI_API_KEY` und `codex --version` im Container |
 | MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver-01-tag-document paperless-ngx-mcp --version` |
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
 | Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, Workflow-Filter prüfen |

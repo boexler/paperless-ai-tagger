@@ -7,7 +7,8 @@ WORKDIR /app
 COPY --from=paperless-mcp /paperless-ngx-mcp /usr/local/bin/paperless-ngx-mcp
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl nano \
+    && apt-get install -y --no-install-recommends ca-certificates curl nano nodejs npm \
+    && npm install -g @openai/codex \
     && rm -rf /var/lib/apt/lists/*
 
 COPY services/webhook-receiver/requirements.txt .
@@ -21,10 +22,11 @@ COPY prompts ./prompts
 
 ENV PYTHONUNBUFFERED=1
 ENV DATA_DIR=/data
+ENV CODEX_HOME=/data/codex
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_ROOT_USER_ACTION=ignore
 
-RUN mkdir -p /data
+RUN mkdir -p /data /data/codex
 
 EXPOSE 8080
 

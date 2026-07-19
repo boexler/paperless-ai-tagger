@@ -5,13 +5,15 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
-from app.config import Settings, settings
+from app.config import Settings, get_settings
 from app.cursor_catalog import log_available_cursor_models
-from app.model_params import format_cursor_model_selection
+from app.providers.factory import format_provider_model
 from app.dedup import ProcessedDocumentStore
 from app.job_queue import TaggingJobQueue
 from app.models import WebhookPayload, extract_document_id
 from app.tagger import DocumentTagger, TaggingResult
+
+settings = get_settings()
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -28,8 +30,8 @@ def create_store(app_settings: Settings) -> ProcessedDocumentStore:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.cursor_list_models_on_startup:
-        log_available_cursor_models(settings.cursor_api_key)
+    if settings.agent_provider == "cursor" and settings.cursor_list_models_on_startup:
+        log_available_cursor_models(settings.cursor_api_key or "")
 
     app.state.settings = settings
     app.state.store = create_store(settings)
@@ -39,8 +41,8 @@ async def lifespan(app: FastAPI):
     await job_queue.start()
     app.state.job_queue = job_queue
     logger.info(
-        "Webhook receiver started (model: %s, prompt: %s, path: %s, max_concurrent_jobs: %s)",
-        format_cursor_model_selection(settings.cursor_model, settings.cursor_model_params),
+        "Webhook receiver started (%s, prompt: %s, path: %s, max_concurrent_jobs: %s)",
+        format_provider_model(settings),
         settings.prompt_template,
         settings.prompt_template_path,
         settings.max_concurrent_jobs,
@@ -52,7 +54,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Paperless AI Tagger",
-    description="Webhook receiver that tags Paperless documents via Cursor SDK + paperless-ngx-mcp",
+    description="Webhook receiver that tags Paperless documents via Cursor SDK or Codex CLI + paperless-ngx-mcp",
     version="0.1.0",
     lifespan=lifespan,
 )
