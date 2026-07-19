@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.codex_config import build_codex_config_content
 from app.config import Settings
+from app.providers.codex import CodexAgentProvider
 from app.providers.factory import create_provider, format_provider_model
 
 
@@ -127,6 +128,26 @@ class ProviderFactoryTests(unittest.TestCase):
             formatted = format_provider_model(settings)
         self.assertIn("provider=codex", formatted)
         self.assertIn("effort=low", formatted)
+
+
+class CodexExecCommandTests(unittest.TestCase):
+    """Validate codex exec CLI arguments for current Codex versions."""
+
+    def test_build_exec_command_uses_current_cli_flags(self) -> None:
+        with patch.dict(
+            os.environ,
+            _env(AGENT_PROVIDER="codex", CODEX_API_KEY="sk-test"),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+            provider = CodexAgentProvider(settings)
+            command = provider._build_exec_command()
+
+        self.assertNotIn("-a", command)
+        self.assertIn("-m", command)
+        self.assertIn("-C", command)
+        self.assertIn("-s", command)
+        self.assertEqual(command[-1], "-")
 
 
 if __name__ == "__main__":

@@ -36,20 +36,21 @@ class CodexAgentProvider:
             "exec",
             "--json",
             "--skip-git-repo-check",
-            "--cd",
+            "-C",
             self.settings.agent_cwd,
-            "-a",
-            self.settings.codex_approval_policy,
             "-s",
             self.settings.codex_sandbox,
+            "-m",
+            self.settings.codex_model,
             "-c",
-            f"model={self.settings.codex_model}",
-            "-c",
-            f"model_reasoning_effort={self.settings.codex_reasoning_effort}",
+            f'model_reasoning_effort="{self.settings.codex_reasoning_effort}"',
         ]
         if self.settings.codex_model_verbosity:
             command.extend(
-                ["-c", f"model_verbosity={self.settings.codex_model_verbosity}"],
+                [
+                    "-c",
+                    f'model_verbosity="{self.settings.codex_model_verbosity}"',
+                ],
             )
         if self.settings.codex_network_access:
             command.extend(["-c", "sandbox_workspace_write.network_access=true"])
