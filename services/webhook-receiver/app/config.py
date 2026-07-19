@@ -33,10 +33,7 @@ class Settings(BaseSettings):
         default=False,
         validation_alias="CURSOR_LIST_MODELS_ON_STARTUP",
     )
-    openai_api_key: str | None = Field(
-        default=None,
-        validation_alias=AliasChoices("OPENAI_API_KEY", "CODEX_API_KEY"),
-    )
+    codex_api_key: str | None = Field(default=None, validation_alias="CODEX_API_KEY")
     codex_command: str = Field(default="codex", validation_alias="CODEX_COMMAND")
     codex_model: str = Field(default="gpt-5.4-mini", validation_alias="CODEX_MODEL")
     codex_reasoning_effort: str = Field(
@@ -160,10 +157,8 @@ class Settings(BaseSettings):
         """Require provider-specific credentials based on AGENT_PROVIDER."""
         if self.agent_provider == "cursor" and not self.cursor_api_key:
             raise ValueError("CURSOR_API_KEY is required when AGENT_PROVIDER=cursor")
-        if self.agent_provider == "codex" and not self.openai_api_key:
-            raise ValueError(
-                "OPENAI_API_KEY (or CODEX_API_KEY) is required when AGENT_PROVIDER=codex",
-            )
+        if self.agent_provider == "codex" and not self.codex_api_key:
+            raise ValueError("CODEX_API_KEY is required when AGENT_PROVIDER=codex")
         return self
 
 

@@ -60,8 +60,8 @@ class CodexAgentProvider:
         """Return environment variables for the Codex subprocess."""
         env = os.environ.copy()
         env["CODEX_HOME"] = self.settings.codex_home
-        if self.settings.openai_api_key:
-            env["OPENAI_API_KEY"] = self.settings.openai_api_key
+        if self.settings.codex_api_key:
+            env["CODEX_API_KEY"] = self.settings.codex_api_key
         return env
 
     def _extract_text(self, payload: Any) -> str | None:

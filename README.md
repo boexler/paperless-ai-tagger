@@ -63,7 +63,7 @@ flowchart LR
 - Docker und Docker Compose auf einem Headless-Server
 - Laufende Paperless-ngx-Instanz mit API-Token
 - **Cursor:** [Cursor API Key](https://cursor.com/dashboard/integrations) (`CURSOR_API_KEY`) bei `AGENT_PROVIDER=cursor`
-- **Codex:** OpenAI API Key (`OPENAI_API_KEY` oder `CODEX_API_KEY`) bei `AGENT_PROVIDER=codex`
+- **Codex:** OpenAI API Key (`CODEX_API_KEY`) bei `AGENT_PROVIDER=codex`
 - Paperless: `PAPERLESS_URL` gesetzt (für `{{doc_url}}` im Webhook)
 
 ## Schnellstart
@@ -90,7 +90,7 @@ Für Codex statt Cursor:
 
 ```env
 AGENT_PROVIDER=codex
-OPENAI_API_KEY=sk-dein-openai-key
+CODEX_API_KEY=sk-dein-openai-key
 CODEX_MODEL=gpt-5.4-mini
 CODEX_REASONING_EFFORT=low
 ```
@@ -321,7 +321,7 @@ export PROMPT_TEMPLATE_PATH=../../prompts/01-tag-document.md
 
 # Codex lokal:
 # export AGENT_PROVIDER=codex
-# export OPENAI_API_KEY=sk-...
+# export CODEX_API_KEY=sk-...
 # export CODEX_COMMAND=codex
 
 uvicorn app.main:app --reload --port 8081
@@ -435,7 +435,7 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 | `CURSOR_MODEL` | nein | Cursor-Modell (Standard: `composer-2.5`) |
 | `CURSOR_MODEL_PARAMS` | nein | Cursor-Parameter als `key:value,key:value` (Standard: `fast:false`) |
 | `CURSOR_LIST_MODELS_ON_STARTUP` | nein | Beim Start Cursor-Modelle loggen (Standard: `false`) |
-| `OPENAI_API_KEY` | bei `codex` | OpenAI API Key (Alias: `CODEX_API_KEY`) |
+| `CODEX_API_KEY` | bei `codex` | OpenAI API Key für Codex CLI |
 | `CODEX_MODEL` | nein | Codex-Modell (Standard: `gpt-5.4-mini`) |
 | `CODEX_REASONING_EFFORT` | nein | Codex-Aufwand: `minimal`/`low`/`medium`/`high`/`xhigh` (Standard: `low`) |
 | `CODEX_MODEL_VERBOSITY` | nein | Codex-Ausgabe: `low`/`medium`/`high` (Standard: `low`) |
@@ -461,7 +461,7 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 |---|---|
 | `doc_url` leer im Webhook | `PAPERLESS_URL` in Paperless setzen |
 | `401 Invalid webhook secret` | Secret in URL/Header und `.env` abgleichen |
-| Agent startet nicht | Bei `cursor`: `CURSOR_API_KEY` prüfen. Bei `codex`: `OPENAI_API_KEY` und `codex --version` im Container |
+| Agent startet nicht | Bei `cursor`: `CURSOR_API_KEY` prüfen. Bei `codex`: `CODEX_API_KEY` und `codex --version` im Container |
 | MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver-01-tag-document paperless-ngx-mcp --version` |
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
 | Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, Workflow-Filter prüfen |

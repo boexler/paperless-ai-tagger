@@ -30,15 +30,15 @@ class SettingsValidationTests(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 Settings(_env_file=None)
 
-    def test_codex_provider_requires_openai_api_key(self) -> None:
+    def test_codex_provider_requires_codex_api_key(self) -> None:
         with patch.dict(os.environ, _env(AGENT_PROVIDER="codex"), clear=True):
             with self.assertRaises(ValidationError):
                 Settings(_env_file=None)
 
-    def test_codex_provider_accepts_openai_api_key(self) -> None:
+    def test_codex_provider_accepts_codex_api_key(self) -> None:
         with patch.dict(
             os.environ,
-            _env(AGENT_PROVIDER="codex", OPENAI_API_KEY="sk-test"),
+            _env(AGENT_PROVIDER="codex", CODEX_API_KEY="sk-test"),
             clear=True,
         ):
             settings = Settings(_env_file=None)
@@ -49,7 +49,7 @@ class SettingsValidationTests(unittest.TestCase):
             os.environ,
             _env(
                 AGENT_PROVIDER="codex",
-                OPENAI_API_KEY="sk-test",
+                CODEX_API_KEY="sk-test",
                 CODEX_REASONING_EFFORT="turbo",
             ),
             clear=True,
@@ -66,7 +66,7 @@ class CodexConfigTests(unittest.TestCase):
             os.environ,
             _env(
                 AGENT_PROVIDER="codex",
-                OPENAI_API_KEY="sk-test",
+                CODEX_API_KEY="sk-test",
                 PAPERLESS_API_TOKEN="paperless-token",
                 CODEX_MODEL="gpt-5.4-mini",
                 CODEX_REASONING_EFFORT="low",
@@ -103,7 +103,7 @@ class ProviderFactoryTests(unittest.TestCase):
             os.environ,
             _env(
                 AGENT_PROVIDER="codex",
-                OPENAI_API_KEY="sk-test",
+                CODEX_API_KEY="sk-test",
                 CODEX_HOME=codex_home,
             ),
             clear=True,
@@ -117,7 +117,7 @@ class ProviderFactoryTests(unittest.TestCase):
             os.environ,
             _env(
                 AGENT_PROVIDER="codex",
-                OPENAI_API_KEY="sk-test",
+                CODEX_API_KEY="sk-test",
                 CODEX_MODEL="gpt-5.4-mini",
                 CODEX_REASONING_EFFORT="low",
             ),
