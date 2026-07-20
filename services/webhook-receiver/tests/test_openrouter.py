@@ -17,6 +17,7 @@ from app.providers.openrouter.orchestrator import OpenRouterOrchestrator
 from app.providers.openrouter.schemas import (
     ClassificationResult,
     CorrespondentDecision,
+    DocumentTaggingResult,
     DocumentTypeDecision,
     TagSelectionResult,
     TaxReviewResult,
@@ -142,13 +143,14 @@ class OpenRouterClientRetryTests(unittest.TestCase):
 
 
 class OpenRouterOrchestratorTests(unittest.TestCase):
-    """Validate multi-step orchestrator apply behavior with mocks."""
+    """Validate single-shot orchestrator apply behavior with mocks."""
 
     def setUp(self) -> None:
         self.prompts_dir = Path(tempfile.mkdtemp())
-        (self.prompts_dir / "03-classify-metadata.md").write_text("classify", encoding="utf-8")
-        (self.prompts_dir / "03-select-tags.md").write_text("tags", encoding="utf-8")
-        (self.prompts_dir / "03-tax-review.md").write_text("tax", encoding="utf-8")
+        (self.prompts_dir / "03-tag-document-tax.md").write_text(
+            "tag document",
+            encoding="utf-8",
+        )
 
         with patch.dict(
             os.environ,
@@ -194,27 +196,30 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
             "Strom": 22,
         }[name]
 
-        self.llm.complete_json.side_effect = [
-            ClassificationResult(
+        self.llm.complete_json.return_value = DocumentTaggingResult(
+            classification=ClassificationResult(
                 correspondent=CorrespondentDecision(action="keep"),
                 document_type=DocumentTypeDecision(action="keep"),
                 title=TitleDecision(action="set", value="Rechnung – Stromabschlag"),
                 classification_note="Stromrechnung erkannt.",
             ),
-            TagSelectionResult(
+            tags=TagSelectionResult(
                 tags_to_add=["Strom", "ai-tag-document"],
                 new_tags=[],
                 tags_note="Allgemeine Tags gesetzt.",
             ),
-            TaxReviewResult(
+            tax=TaxReviewResult(
                 result="none",
                 tags_to_add=["ai-tag-tax"],
                 tax_note="Privater Verbrauch.",
             ),
-        ]
+        )
 
         summary = self.orchestrator.run(42)
 
+        self.llm.complete_json.assert_called_once()
+        schema = self.llm.complete_json.call_args.args[2]
+        self.assertIs(schema, DocumentTaggingResult)
         self.paperless.update_document.assert_called_once()
         kwargs = self.paperless.update_document.call_args.kwargs
         self.assertEqual(kwargs["title"], "Rechnung – Stromabschlag")
@@ -239,7 +244,7 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
 
         with self.assertRaises(Exception) as ctx:
             self.orchestrator.run(1)
-        self.assertIn("Step 1 classify failed", str(ctx.exception))
+        self.assertIn("Tagging request failed", str(ctx.exception))
 
 
 if __name__ == "__main__":

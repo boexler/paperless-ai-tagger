@@ -1,4 +1,4 @@
-"""Pydantic schemas for OpenRouter multi-step JSON responses."""
+"""Pydantic schemas for OpenRouter single-shot JSON responses."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ class TitleDecision(BaseModel):
 
 
 class ClassificationResult(BaseModel):
-    """Step 1 JSON: metadata classification."""
+    """Metadata classification section."""
 
     correspondent: CorrespondentDecision = Field(default_factory=CorrespondentDecision)
     document_type: DocumentTypeDecision = Field(default_factory=DocumentTypeDecision)
@@ -47,7 +47,7 @@ class ClassificationResult(BaseModel):
 
 
 class TagSelectionResult(BaseModel):
-    """Step 2 JSON: general tags."""
+    """General (non-tax) tags section."""
 
     tags_to_add: list[str] = Field(default_factory=list)
     new_tags: list[str] = Field(default_factory=list)
@@ -58,7 +58,7 @@ class TagSelectionResult(BaseModel):
 
 
 class TaxReviewResult(BaseModel):
-    """Step 3 JSON: tax relevance."""
+    """Tax relevance section."""
 
     result: Literal["relevant", "maybe", "none"] = "none"
     tags_to_add: list[str] = Field(default_factory=list)
@@ -66,3 +66,11 @@ class TaxReviewResult(BaseModel):
     needs_review: bool = False
     professional_context: str = "keine"
     tax_note: str = ""
+
+
+class DocumentTaggingResult(BaseModel):
+    """Single-shot OpenRouter response for classify + tags + tax."""
+
+    classification: ClassificationResult = Field(default_factory=ClassificationResult)
+    tags: TagSelectionResult = Field(default_factory=TagSelectionResult)
+    tax: TaxReviewResult = Field(default_factory=TaxReviewResult)

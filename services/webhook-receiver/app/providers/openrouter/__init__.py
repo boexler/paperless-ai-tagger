@@ -1,4 +1,4 @@
-"""OpenRouter multi-step tagging provider (no MCP tool calling)."""
+"""OpenRouter single-shot tagging provider (no MCP tool calling)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class OpenRouterAgentProvider:
-    """Tags documents via OpenRouter multi-step JSON + Paperless REST apply."""
+    """Tags documents via one OpenRouter JSON call + Paperless REST apply."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
@@ -29,7 +29,7 @@ class OpenRouterAgentProvider:
         document_type: str | None = None,
         doc_url: str | None = None,
     ) -> TaggingResult:
-        """Run the OpenRouter classify → tags → tax → apply pipeline."""
+        """Run the OpenRouter single-shot tagging → apply pipeline."""
         _ = (doc_title, correspondent, document_type, doc_url)
         run_id = str(uuid.uuid4())
         logger.info(

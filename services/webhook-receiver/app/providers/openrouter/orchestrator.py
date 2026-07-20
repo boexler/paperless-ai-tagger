@@ -1,4 +1,4 @@
-"""Multi-step OpenRouter orchestration: classify → tags → tax → apply."""
+"""Single-shot OpenRouter orchestration: classify + tags + tax → apply."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from app.paperless_client import PaperlessClient, PaperlessClientError
 from app.providers.openrouter.client import OpenRouterClient, OpenRouterClientError
 from app.providers.openrouter.schemas import (
     ClassificationResult,
+    DocumentTaggingResult,
     TagSelectionResult,
     TaxReviewResult,
 )
@@ -19,32 +20,18 @@ from app.providers.openrouter.schemas import (
 logger = logging.getLogger(__name__)
 
 OPENROUTER_PROMPTS_DIR = Path("/app/prompts/openrouter")
+COMBINED_PROMPT_FILE = "03-tag-document-tax.md"
 
 REQUIRED_PROCESS_TAGS = ("ai-tag-document", "ai-tag-tax")
 MAX_NEW_TAGS = 5
-TAX_TAG_NAMES = {
-    "steuerrelevant",
-    "werbungskosten",
-    "arbeitsmittel",
-    "fortbildung",
-    "fachliteratur",
-    "homeoffice",
-    "arbeitszimmer",
-    "reisekosten",
-    "fahrtkosten",
-    "bewerbung",
-    "berufsverband",
-    "ai-tag-tax",
-    "ai-review-tag-tax",
-}
 
 
 class OpenRouterOrchestratorError(Exception):
-    """Raised when the multi-step OpenRouter pipeline fails."""
+    """Raised when the OpenRouter tagging pipeline fails."""
 
 
 class OpenRouterOrchestrator:
-    """Runs three LLM steps then applies results via Paperless REST."""
+    """Runs one LLM call then applies results via Paperless REST."""
 
     def __init__(
         self,
@@ -68,21 +55,21 @@ class OpenRouterOrchestrator:
             self.paperless.close()
 
     def run(self, document_id: int) -> str:
-        """Execute the full pipeline and return a short German summary."""
-        logger.info("OpenRouter step load context for document %s", document_id)
+        """Execute load → single LLM call → apply and return a short summary."""
+        logger.info("OpenRouter load context for document %s", document_id)
         context = self._load_context(document_id)
 
-        logger.info("OpenRouter step 1 classify for document %s", document_id)
-        classification = self._run_classify(context)
-
-        logger.info("OpenRouter step 2 tags for document %s", document_id)
-        tags = self._run_tags(context, classification)
-
-        logger.info("OpenRouter step 3 tax for document %s", document_id)
-        tax = self._run_tax(context, classification, tags)
+        logger.info("OpenRouter single-shot tagging for document %s", document_id)
+        result = self._run_tagging(context)
 
         logger.info("OpenRouter apply for document %s", document_id)
-        return self._apply(document_id, context, classification, tags, tax)
+        return self._apply(
+            document_id,
+            context,
+            result.classification,
+            result.tags,
+            result.tax,
+        )
 
     def _load_prompt(self, filename: str) -> str:
         path = self.prompts_dir / filename
@@ -128,38 +115,13 @@ class OpenRouterOrchestrator:
             },
         }
 
-    def _run_classify(self, context: dict[str, Any]) -> ClassificationResult:
-        system = self._load_prompt("03-classify-metadata.md")
-        user = _build_classify_user_prompt(context)
+    def _run_tagging(self, context: dict[str, Any]) -> DocumentTaggingResult:
+        system = self._load_prompt(COMBINED_PROMPT_FILE)
+        user = _build_tagging_user_prompt(context)
         try:
-            return self.llm.complete_json(system, user, ClassificationResult)
+            return self.llm.complete_json(system, user, DocumentTaggingResult)
         except OpenRouterClientError as exc:
-            raise OpenRouterOrchestratorError(f"Step 1 classify failed: {exc}") from exc
-
-    def _run_tags(
-        self,
-        context: dict[str, Any],
-        classification: ClassificationResult,
-    ) -> TagSelectionResult:
-        system = self._load_prompt("03-select-tags.md")
-        user = _build_tags_user_prompt(context, classification)
-        try:
-            return self.llm.complete_json(system, user, TagSelectionResult)
-        except OpenRouterClientError as exc:
-            raise OpenRouterOrchestratorError(f"Step 2 tags failed: {exc}") from exc
-
-    def _run_tax(
-        self,
-        context: dict[str, Any],
-        classification: ClassificationResult,
-        tags: TagSelectionResult,
-    ) -> TaxReviewResult:
-        system = self._load_prompt("03-tax-review.md")
-        user = _build_tax_user_prompt(context, classification, tags)
-        try:
-            return self.llm.complete_json(system, user, TaxReviewResult)
-        except OpenRouterClientError as exc:
-            raise OpenRouterOrchestratorError(f"Step 3 tax failed: {exc}") from exc
+            raise OpenRouterOrchestratorError(f"Tagging request failed: {exc}") from exc
 
     def _apply(
         self,
@@ -344,6 +306,7 @@ class OpenRouterOrchestrator:
         merged: set[int] = set(context["existing_tag_ids"])
         notes: list[str] = []
         created: list[str] = []
+        tags_by_id: dict[int, str] = dict(context["tags_by_id"])
 
         names_to_ensure: list[str] = []
         for name in [*tags.tags_to_add, *tags.new_tags, *tax.tags_to_add, *tax.new_tags]:
@@ -371,7 +334,6 @@ class OpenRouterOrchestrator:
             if "steuerrelevant".casefold() not in {n.casefold() for n in names_to_ensure}:
                 names_to_ensure.append("steuerrelevant")
 
-        # Deduplicate while preserving order
         unique_names: list[str] = []
         seen: set[str] = set()
         for name in names_to_ensure:
@@ -398,7 +360,6 @@ class OpenRouterOrchestrator:
             created.append(name)
             new_count += 1
 
-        tags_by_id: dict[int, str] = dict(context["tags_by_id"])
         for name, tag_id in tags_by_name.items():
             tags_by_id.setdefault(tag_id, name)
         added_names = [
@@ -457,7 +418,7 @@ def _compact_catalog(items: list[dict[str, Any]], fields: tuple[str, ...]) -> li
     return compact
 
 
-def _build_classify_user_prompt(context: dict[str, Any]) -> str:
+def _build_tagging_user_prompt(context: dict[str, Any]) -> str:
     document = context["document"]
     payload = {
         "document": {
@@ -465,7 +426,10 @@ def _build_classify_user_prompt(context: dict[str, Any]) -> str:
             "title": document.get("title"),
             "correspondent": document.get("correspondent"),
             "document_type": document.get("document_type"),
-            "tags": context["existing_tag_ids"],
+            "existing_tags": [
+                {"id": tag_id, "name": context["tags_by_id"].get(tag_id, str(tag_id))}
+                for tag_id in context["existing_tag_ids"]
+            ],
             "created": document.get("created"),
             "content_truncated": context["content_truncated"],
             "content": context["content"],
@@ -478,77 +442,10 @@ def _build_classify_user_prompt(context: dict[str, Any]) -> str:
             context["document_types"],
             ("id", "name"),
         ),
-    }
-    return (
-        "Klassifiziere das folgende Dokument. Antworte nur mit JSON.\n\n"
-        + json.dumps(payload, ensure_ascii=False, indent=2)
-    )
-
-
-def _build_tags_user_prompt(
-    context: dict[str, Any],
-    classification: ClassificationResult,
-) -> str:
-    document = context["document"]
-    general_tags = [
-        tag
-        for tag in context["tags"]
-        if str(tag.get("name") or "").casefold() not in TAX_TAG_NAMES
-    ]
-    payload = {
-        "document": {
-            "id": document.get("id"),
-            "title": (
-                classification.title.value
-                if classification.title.action == "set" and classification.title.value
-                else document.get("title")
-            ),
-            "correspondent_decision": classification.correspondent.model_dump(),
-            "document_type_decision": classification.document_type.model_dump(),
-            "existing_tags": [
-                {"id": tag_id, "name": context["tags_by_id"].get(tag_id, str(tag_id))}
-                for tag_id in context["existing_tag_ids"]
-            ],
-            "needs_review_hint": classification.needs_review,
-            "content_truncated": context["content_truncated"],
-            "content": context["content"],
-        },
-        "available_tags": _compact_catalog(general_tags, ("id", "name")),
-        "classification_note": classification.classification_note,
-    }
-    return (
-        "Wähle allgemeine Tags. Antworte nur mit JSON.\n\n"
-        + json.dumps(payload, ensure_ascii=False, indent=2)
-    )
-
-
-def _build_tax_user_prompt(
-    context: dict[str, Any],
-    classification: ClassificationResult,
-    tags: TagSelectionResult,
-) -> str:
-    document = context["document"]
-    payload = {
-        "document": {
-            "id": document.get("id"),
-            "title": (
-                classification.title.value
-                if classification.title.action == "set" and classification.title.value
-                else document.get("title")
-            ),
-            "correspondent_decision": classification.correspondent.model_dump(),
-            "document_type_decision": classification.document_type.model_dump(),
-            "general_tags": tags.tags_to_add,
-            "new_general_tags": tags.new_tags,
-            "content_truncated": context["content_truncated"],
-            "content": context["content"],
-        },
         "available_tags": _compact_catalog(context["tags"], ("id", "name")),
-        "tags_note": tags.tags_note,
-        "classification_note": classification.classification_note,
     }
     return (
-        "Prüfe die Steuerrelevanz. Antworte nur mit JSON.\n\n"
+        "Klassifiziere, tagge und prüfe die Steuerrelevanz. Antworte nur mit JSON.\n\n"
         + json.dumps(payload, ensure_ascii=False, indent=2)
     )
 

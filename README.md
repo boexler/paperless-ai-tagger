@@ -19,7 +19,7 @@ flowchart LR
 | **webhook-receiver** | FastAPI-Dienst: nimmt Webhook entgegen, startet den gewählten Agenten |
 | **paperless-ngx-mcp** | MCP-Server (stdio) für Cursor/Codex; im Image enthalten |
 | **prompts/03-tag-document-tax.md** | MCP-Prompt für Cursor/Codex: Klassifikation + Steuer in einem Lauf |
-| **prompts/openrouter/** | Kurz-Prompts für den OpenRouter Multi-Step-Orchestrator |
+| **prompts/openrouter/** | JSON-Prompt für den OpenRouter Single-Shot-Orchestrator |
 
 ## Pipeline (Stufe 03)
 
@@ -140,10 +140,8 @@ paperless-ai-tagger/
 ├── .env.example
 ├── prompts/
 │   ├── 03-tag-document-tax.md      # MCP-Prompt (Cursor/Codex)
-│   └── openrouter/                 # Multi-Step-Prompts (OpenRouter)
-│       ├── 03-classify-metadata.md
-│       ├── 03-select-tags.md
-│       └── 03-tax-review.md
+│   └── openrouter/                 # Single-Shot-Prompt (OpenRouter)
+│       └── 03-tag-document-tax.md
 ├── services/
 │   └── webhook-receiver/
 │       ├── Dockerfile
@@ -169,7 +167,7 @@ Umschaltbar per `AGENT_PROVIDER`. **Nicht** mehrere Provider parallel auf densel
 |---|---|---|
 | **Cursor** (Standard) | `cursor` | [Cursor Python SDK](https://cursor.com/docs/sdk/python) + MCP |
 | **Codex** | `codex` | [OpenAI Codex CLI](https://developers.openai.com/codex/) + MCP |
-| **OpenRouter** | `openrouter` | OpenRouter API (Multi-Step JSON) + Paperless REST |
+| **OpenRouter** | `openrouter` | OpenRouter API (Single-Shot JSON) + Paperless REST |
 
 ### cursor
 
@@ -218,9 +216,9 @@ CODEX_NETWORK_ACCESS=true
 
 ### openrouter
 
-Kein Tool-Calling. Python lädt Kontext über die Paperless REST-API, ruft OpenRouter in drei Schritten auf (Klassifikation → Tags → Steuer), schreibt Ergebnisse deterministisch zurück.
+Kein Tool-Calling. Python lädt Kontext über die Paperless REST-API, stellt **eine** OpenRouter-Anfrage (Klassifikation + Tags + Steuer in einem JSON), schreibt Ergebnisse deterministisch zurück.
 
-Prompts unter `prompts/openrouter/` (JSON-only, kurz).
+Prompt: `prompts/openrouter/03-tag-document-tax.md` (JSON-only).
 
 ```env
 AGENT_PROVIDER=openrouter
@@ -361,7 +359,7 @@ Provider-spezifische Variablen: siehe [cursor](#cursor), [codex](#codex), [openr
 | `401 Invalid webhook secret` | Secret in URL/Header und `.env` abgleichen |
 | Agent startet nicht | Provider-Key prüfen (`CURSOR_API_KEY` / `CODEX_API_KEY` / `OPENROUTER_API_KEY`) |
 | MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver-03-tag-document-tax paperless-ngx-mcp --version` |
-| OpenRouter: invalid JSON / run_error | Modell wechseln; Free-Tier Rate Limits prüfen; Logs der drei Steps ansehen |
+| OpenRouter: invalid JSON / run_error | Modell wechseln; Free-Tier Rate Limits prüfen; Raw-Response-Logs ansehen |
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
 | Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` und Workflow-Filter prüfen |
 | `Skipping document … (already processed recently)` | Eintrag in `/data/processed_documents.json` löschen (siehe [Deduplizierung](#deduplizierung)) |
