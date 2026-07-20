@@ -6,9 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.model_params import parse_cursor_model_params
 
-DEFAULT_PROMPT_TEMPLATE = "01-tag-document.md"
+DEFAULT_PROMPT_TEMPLATE = "03-tag-document-tax.md"
 DOCKER_PROMPTS_DIR = "/app/prompts"
-AGENT_PROVIDERS = ("cursor", "codex")
+AGENT_PROVIDERS = ("cursor", "codex", "openrouter")
+DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
+DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 CODEX_REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh")
 CODEX_APPROVAL_POLICIES = ("untrusted", "on-request", "on-failure", "never")
 CODEX_SANDBOX_MODES = ("read-only", "workspace-write", "danger-full-access")
@@ -19,7 +21,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     webhook_secret: str = Field(validation_alias="WEBHOOK_SECRET")
-    agent_provider: Literal["cursor", "codex"] = Field(
+    agent_provider: Literal["cursor", "codex", "openrouter"] = Field(
         default="cursor",
         validation_alias="AGENT_PROVIDER",
     )
@@ -57,6 +59,30 @@ class Settings(BaseSettings):
         validation_alias="CODEX_NETWORK_ACCESS",
     )
     codex_home: str = Field(default="/data/codex", validation_alias="CODEX_HOME")
+    openrouter_api_key: str | None = Field(
+        default=None,
+        validation_alias="OPENROUTER_API_KEY",
+    )
+    openrouter_model: str = Field(
+        default=DEFAULT_OPENROUTER_MODEL,
+        validation_alias="OPENROUTER_MODEL",
+    )
+    openrouter_base_url: str = Field(
+        default=DEFAULT_OPENROUTER_BASE_URL,
+        validation_alias="OPENROUTER_BASE_URL",
+    )
+    openrouter_http_referer: str | None = Field(
+        default=None,
+        validation_alias="OPENROUTER_HTTP_REFERER",
+    )
+    openrouter_app_name: str | None = Field(
+        default=None,
+        validation_alias="OPENROUTER_APP_NAME",
+    )
+    openrouter_max_content_chars: int = Field(
+        default=50000,
+        validation_alias="OPENROUTER_MAX_CONTENT_CHARS",
+    )
     paperless_url: str = Field(
         validation_alias=AliasChoices("PAPERLESS_URL", "PAPERLESS_BASE_URL"),
     )
@@ -141,6 +167,14 @@ class Settings(BaseSettings):
             )
         return normalized
 
+    @field_validator("openrouter_max_content_chars")
+    @classmethod
+    def validate_openrouter_max_content_chars(cls, value: int) -> int:
+        """Require a positive OCR truncation limit."""
+        if value < 1:
+            raise ValueError("OPENROUTER_MAX_CONTENT_CHARS must be >= 1")
+        return value
+
     @model_validator(mode="after")
     def resolve_prompt_template_path(self) -> Self:
         """Resolve prompt path from PROMPT_TEMPLATE when PROMPT_TEMPLATE_PATH is unset."""
@@ -159,6 +193,10 @@ class Settings(BaseSettings):
             raise ValueError("CURSOR_API_KEY is required when AGENT_PROVIDER=cursor")
         if self.agent_provider == "codex" and not self.codex_api_key:
             raise ValueError("CODEX_API_KEY is required when AGENT_PROVIDER=codex")
+        if self.agent_provider == "openrouter" and not self.openrouter_api_key:
+            raise ValueError(
+                "OPENROUTER_API_KEY is required when AGENT_PROVIDER=openrouter",
+            )
         return self
 
 

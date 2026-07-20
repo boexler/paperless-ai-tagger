@@ -213,6 +213,27 @@ class CodexOutputParsingTests(unittest.TestCase):
         self.assertEqual(event_count, 1)
         self.assertEqual(tool_count, 1)
 
+    def test_parse_failed_mcp_tool_call_error_message(self) -> None:
+        provider = self._provider()
+        stdout = (
+            '{"type":"item.completed","item":{"type":"mcp_tool_call",'
+            '"server":"paperless","tool":"tag_list","status":"failed",'
+            '"arguments":{"page":1},"result":null,'
+            '"error":{"message":"user cancelled MCP tool call"}}}'
+        )
+
+        summary, error, tool_errors, event_count, tool_count = provider._parse_codex_output(
+            1028,
+            stdout,
+            "",
+        )
+
+        self.assertIsNone(summary)
+        self.assertEqual(error, "paperless.tag_list: user cancelled MCP tool call")
+        self.assertEqual(tool_errors, ["paperless.tag_list: user cancelled MCP tool call"])
+        self.assertEqual(event_count, 1)
+        self.assertEqual(tool_count, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

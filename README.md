@@ -2,68 +2,47 @@
 
 Automatisches Taggen von [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx)-Dokumenten per KI.
 
-Wenn in Paperless ein neues Dokument hinzukommt, feuert ein Workflow-Webhook diesen Dienst. Der Webhook-Receiver startet einen KI-Agenten (**Cursor SDK** oder **OpenAI Codex CLI**) mit [paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) und lässt das Dokument automatisch taggen. Der Provider wird über `AGENT_PROVIDER` gewählt.
+Wenn in Paperless ein neues Dokument hinzukommt, feuert ein Workflow-Webhook diesen Dienst. Der Webhook-Receiver startet einen KI-Agenten (gewählt über `AGENT_PROVIDER`) und lässt das Dokument automatisch klassifizieren und steuerlich prüfen. Paperless-Zugriff erfolgt über [paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) (Cursor/Codex) bzw. die Paperless REST-API (OpenRouter).
 
 ## Architektur
 
 ```mermaid
 flowchart LR
     P[Paperless-ngx] -->|Workflow Webhook| W[webhook-receiver]
-    W -->|Cursor SDK oder Codex CLI| A[KI-Agent]
-    A -->|stdio MCP| M[paperless-ngx-mcp]
-    M -->|REST API| P
+    W -->|AGENT_PROVIDER| A[KI-Agent]
+    A -->|MCP oder REST| P
 ```
 
 | Komponente | Rolle |
 |---|---|
 | **Paperless-ngx** | Dokumentenverwaltung, feuert Webhook bei „Document Added“ |
-| **paperless-ngx-mcp** | MCP-Server (stdio) mit Zugriff auf die Paperless-API, im webhook-receiver-Image enthalten |
-| **webhook-receiver** | FastAPI-Dienst, nimmt Webhook entgegen, startet Cursor SDK oder Codex CLI (bis zu drei Instanzen) |
-| **prompts/01-tag-document.md** | Prompt für Klassifikation: Korrespondent, Dokumenttyp, Titel, Tags (setzt `ai-tag-document`) |
-| **prompts/02-tag-tax.md** | Prompt für die nachgelagerte Steuerprüfung (setzt `ai-tag-tax`) |
-| **prompts/03-tag-document-tax.md** | Kombi-Prompt: Klassifikation + Steuerprüfung in einem Agenten-Lauf |
+| **webhook-receiver** | FastAPI-Dienst: nimmt Webhook entgegen, startet den gewählten Agenten |
+| **paperless-ngx-mcp** | MCP-Server (stdio) für Cursor/Codex; im Image enthalten |
+| **prompts/03-tag-document-tax.md** | MCP-Prompt für Cursor/Codex: Klassifikation + Steuer in einem Lauf |
+| **prompts/openrouter/** | Kurz-Prompts für den OpenRouter Multi-Step-Orchestrator |
 
-## Zweistufige Pipeline
+## Pipeline (Stufe 03)
+
+Ein Webhook auf Port `8083` führt Klassifikation und Steuerprüfung in einem Durchlauf aus.
 
 ```mermaid
 sequenceDiagram
     participant P as Paperless
-    participant W1 as 01:8081
-    participant A1 as CursorAgent
-    participant W2 as 02:8082
-    participant A2 as CursorAgent
+    participant W as webhook:8083
+    participant A as KI-Agent
 
-    P->>W1: Workflow1 DocumentAdded
-    W1->>A1: TaggingJob
-    A1->>P: correspondent + doctype + title + tags + ai-tag-document
-    P->>W2: Workflow2 DocumentUpdated
-    W2->>A2: TaxReviewJob
-    A2->>P: document_update ai-tag-tax
+    P->>W: Workflow DocumentAdded
+    W->>A: TaggingJob
+    A->>P: correspondent + doctype + title + tags + ai-tag-document + ai-tag-tax
 ```
 
-Die Reihenfolge steuert Paperless über zwei Workflows — nicht Docker. Stufe 01 antwortet asynchron (`202`); Stufe 02 feuert erst, wenn Paperless das Update mit `ai-tag-document` meldet.
-
-**Port-Konvention:** Stufe `NN` → Host-Port `808N` (01 → 8081, 02 → 8082, 03 → 8083).
-
-### Ein-Stufen-Alternative (Stufe 03)
-
-Statt der Zwei-Stufen-Pipeline (01 → 02) kann **ein** Webhook auf Port `8083` Klassifikation und Steuerprüfung in einem Cursor-Agent-Lauf ausführen (`03-tag-document-tax.md`). Spart einen Agenten-Lauf pro Dokument.
-
-**Wichtig:** Pro Dokument **entweder** die Pipeline 01→02 **oder** Stufe 03 verwenden — nicht beides parallel, sonst Doppelverarbeitung.
-
-```mermaid
-flowchart LR
-    P[Paperless DocumentAdded] --> W3[03:8083]
-    W3 --> A3[Agent Klassifikation + Steuer]
-    A3 --> P2[document_update ai-tag-document + ai-tag-tax]
-```
+Der Dienst antwortet asynchron mit `202` und verarbeitet Jobs in einer begrenzten Warteschlange (`MAX_CONCURRENT_JOBS`).
 
 ## Voraussetzungen
 
 - Docker und Docker Compose auf einem Headless-Server
 - Laufende Paperless-ngx-Instanz mit API-Token
-- **Cursor:** [Cursor API Key](https://cursor.com/dashboard/integrations) (`CURSOR_API_KEY`) bei `AGENT_PROVIDER=cursor`
-- **Codex:** OpenAI API Key (`CODEX_API_KEY`) bei `AGENT_PROVIDER=codex`
+- API-Key für den gewählten Provider (siehe [Agent-Provider](#agent-provider))
 - Paperless: `PAPERLESS_URL` gesetzt (für `{{doc_url}}` im Webhook)
 
 ## Schnellstart
@@ -76,24 +55,16 @@ cd paperless-ai-tagger
 cp .env.example .env
 ```
 
-`.env` anpassen:
+`.env` anpassen (gemeinsame Basis):
 
 ```env
 PAPERLESS_BASE_URL=https://paperless.deine-domain.de
 PAPERLESS_API_TOKEN=dein-api-token
-AGENT_PROVIDER=cursor
-CURSOR_API_KEY=cursor_dein_api_key
 WEBHOOK_SECRET=ein-langes-zufaelliges-secret
+AGENT_PROVIDER=cursor
 ```
 
-Für Codex statt Cursor:
-
-```env
-AGENT_PROVIDER=codex
-CODEX_API_KEY=sk-dein-openai-key
-CODEX_MODEL=gpt-5.4-mini
-CODEX_REASONING_EFFORT=low
-```
+Provider-spezifische Keys und Modelle: siehe Unterkapitel unter [Agent-Provider](#agent-provider).
 
 > **Image-Version:** Das `paperless-ngx-mcp`-Binary wird beim Image-Build aus [freeformz/paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) übernommen. Version in `services/webhook-receiver/Dockerfile` anpassen.
 
@@ -103,77 +74,29 @@ CODEX_REASONING_EFFORT=low
 docker compose up -d --build
 ```
 
-Drei Instanzen starten automatisch (01 und 02 für die Zwei-Stufen-Pipeline; 03 optional als Ein-Stufen-Alternative):
-
-| Instanz | Container | Port | Prompt |
+| Instanz | Container | Port | Prompt (Cursor/Codex) |
 |---|---|---|---|
-| Klassifikation (Stufe 01) | `paperless-ai-tagger-01-tag-document.md` | `8081` (`WEBHOOK_PORT_01`) | `01-tag-document.md` |
-| Steuerprüfung (Stufe 02) | `paperless-ai-tagger-02-tag-tax.md` | `8082` (`WEBHOOK_PORT_02`) | `02-tag-tax.md` |
-| Kombi (Stufe 03) | `paperless-ai-tagger-03-tag-document-tax.md` | `8083` (`WEBHOOK_PORT_03`) | `03-tag-document-tax.md` |
+| Kombi Klassifikation + Steuer | `paperless-ai-tagger-03-tag-document-tax.md` | `8083` (`WEBHOOK_PORT_03`) | `03-tag-document-tax.md` |
 
 Healthcheck:
 
 ```bash
-curl http://localhost:8081/health
-curl http://localhost:8082/health
 curl http://localhost:8083/health
 ```
 
-### 3. Paperless-Workflows einrichten
+### 3. Paperless-Workflow einrichten
 
-Die Pipeline besteht aus zwei Workflows. Stufe 02 startet erst, wenn Stufe 01 das Dokument aktualisiert hat (Tag `ai-tag-document` gesetzt).
+In Paperless unter **Einstellungen → Workflows** einen Workflow anlegen:
 
-#### Workflow 1 — Klassifikation (Stufe 01)
-
-In Paperless: **Einstellungen → Workflows → Neuer Workflow**
-
-| Einstellung | Wert |
+| Feld | Wert |
 |---|---|
-| Trigger | **Document Added** |
-| Filter | optional: Dokument hat **nicht** Tag `ai-tag-document` |
-| Aktion | **Webhook** |
+| Trigger | Document Added |
+| Action | Webhook |
+| URL | `http://<dein-server>:8083/webhook?secret=<WEBHOOK_SECRET>` |
+| Body | JSON (siehe unten) |
+| Send as JSON | aktivieren |
 
-**Webhook-URL:**
-
-```
-http://<dein-server>:8081/webhook?secret=<WEBHOOK_SECRET>
-```
-
-#### Workflow 2 — Steuerprüfung (Stufe 02, nachgelagert)
-
-| Einstellung | Wert |
-|---|---|
-| Trigger | **Document Updated** |
-| Filter | hat Tag `ai-tag-document` **und** hat **nicht** Tag `ai-tag-tax` |
-| Aktion | **Webhook** |
-
-**Webhook-URL:**
-
-```
-http://<dein-server>:8082/webhook?secret=<WEBHOOK_SECRET>
-```
-
-#### Workflow 3 — Kombi (Stufe 03, Ein-Stufen-Alternative)
-
-Alternative zu Workflow 1 + 2: ein Agent für Klassifikation und Steuerprüfung.
-
-| Einstellung | Wert |
-|---|---|
-| Trigger | **Document Added** |
-| Filter | optional: Dokument hat **nicht** Tag `ai-tag-document` |
-| Aktion | **Webhook** |
-
-**Webhook-URL:**
-
-```
-http://<dein-server>:8083/webhook?secret=<WEBHOOK_SECRET>
-```
-
-Wenn Stufe 03 aktiv ist, Workflow 1 und 2 für dieselben Dokumente deaktivieren oder per Tag-Filter trennen.
-
-Wenn Paperless im selben Docker-Netzwerk läuft, die interne Service-URL verwenden und `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS=true` setzen.
-
-**Webhook-Body (JSON):**
+Webhook-Body:
 
 ```json
 {
@@ -184,16 +107,16 @@ Wenn Paperless im selben Docker-Netzwerk läuft, die interne Service-URL verwend
 }
 ```
 
-Im Workflow die Option **„Send WebHook payload as JSON“** aktivieren.
-
 > Paperless hat keinen direkten `{{document_id}}`-Placeholder. Die Dokumenten-ID wird aus `{{doc_url}}` extrahiert (z. B. `.../documents/87/` → ID `87`).
+
+Optional: Filter so setzen, dass bereits getaggte Dokumente (`ai-tag-document` / `ai-tag-tax`) nicht erneut getriggert werden.
 
 ### 4. Testen
 
 Synchroner Test-Endpunkt (für Debugging, blockiert bis der Agent fertig ist):
 
 ```bash
-curl -X POST "http://localhost:8081/webhook/sync?secret=DEIN_SECRET" \
+curl -X POST "http://localhost:8083/webhook/sync?secret=DEIN_SECRET" \
   -H "Content-Type: application/json" \
   -d '{
     "doc_url": "https://paperless.example.com/documents/42/",
@@ -213,78 +136,66 @@ WEBHOOK_SECRET=dein-secret ./scripts/smoke-test.sh
 
 ```
 paperless-ai-tagger/
-├── docker-compose.yml          # webhook-receiver (inkl. paperless-ngx-mcp)
+├── docker-compose.yml
 ├── .env.example
 ├── prompts/
-│   ├── 01-tag-document.md        # Prompt: Klassifikation (Korrespondent, Typ, Titel, Tags)
-│   ├── 02-tag-tax.md             # Prompt: Steuerrelevanz-Prüfung
-│   └── 03-tag-document-tax.md    # Prompt: Kombi Klassifikation + Steuer
-├── config/
-│   └── mcp.json.example        # Referenz (SDK nutzt inline MCP-Config)
+│   ├── 03-tag-document-tax.md      # MCP-Prompt (Cursor/Codex)
+│   └── openrouter/                 # Multi-Step-Prompts (OpenRouter)
+│       ├── 03-classify-metadata.md
+│       ├── 03-select-tags.md
+│       └── 03-tax-review.md
 ├── services/
-│   └── webhook-receiver/       # FastAPI + Cursor SDK
+│   └── webhook-receiver/
 │       ├── Dockerfile
 │       ├── requirements.txt
 │       └── app/
-│           ├── main.py         # Webhook-Endpunkte
-│           ├── job_queue.py    # Begrenzte Job-Warteschlange
-│           ├── tagger.py       # Provider-Fassade (Cursor/Codex)
-│           ├── providers/      # Cursor SDK + Codex CLI Backends
-│           ├── codex_config.py # Codex config.toml Generator
-│           ├── config.py       # Umgebungsvariablen
-│           ├── models.py       # Payload-Modelle
-│           └── dedup.py        # Deduplizierung
+│           ├── main.py
+│           ├── job_queue.py
+│           ├── tagger.py
+│           ├── paperless_client.py # REST-Client (OpenRouter)
+│           ├── providers/          # cursor / codex / openrouter
+│           ├── config.py
+│           ├── models.py
+│           └── dedup.py
 └── scripts/
     └── smoke-test.sh
 ```
 
 ## Agent-Provider
 
-Der Dienst unterstützt zwei Backends, umschaltbar per `AGENT_PROVIDER`:
+Umschaltbar per `AGENT_PROVIDER`. **Nicht** mehrere Provider parallel auf denselben Paperless-Workflow legen.
 
-| Provider | Wert | Integration | Modell / Aufwand |
-|---|---|---|---|
-| **Cursor** (Standard) | `cursor` | [Cursor Python SDK](https://cursor.com/docs/sdk/python) | `CURSOR_MODEL`, `CURSOR_MODEL_PARAMS` (z. B. `fast:true` für günstiger) |
-| **Codex** | `codex` | [OpenAI Codex CLI](https://developers.openai.com/codex/) (`codex exec`) | `CODEX_MODEL`, `CODEX_REASONING_EFFORT` (`minimal`/`low`/`medium`/`high`/`xhigh`) |
+| Provider | Wert | Integration |
+|---|---|---|
+| **Cursor** (Standard) | `cursor` | [Cursor Python SDK](https://cursor.com/docs/sdk/python) + MCP |
+| **Codex** | `codex` | [OpenAI Codex CLI](https://developers.openai.com/codex/) + MCP |
+| **OpenRouter** | `openrouter` | OpenRouter API (Multi-Step JSON) + Paperless REST |
 
-Beide Provider nutzen `paperless-ngx-mcp` als stdio-MCP-Server für Paperless-API-Zugriff.
+### cursor
 
-### Cursor SDK
+Nutzt das Cursor Python SDK mit inline `paperless-ngx-mcp`. Prompt: `prompts/03-tag-document-tax.md`.
 
-Der Cursor-Provider nutzt das Cursor Python SDK (`cursor-sdk`), nicht die CLI. Vorteile:
-
-- Sauberes Error-Handling (`CursorAgentError` vs. `result.status == "error"`)
-- Inline MCP-Konfiguration ohne `mcp.json` im Container
-- Automatisches Cleanup nach `Agent.prompt()`
-
-Kernlogik in `services/webhook-receiver/app/providers/cursor.py`:
-
-```python
-AgentOptions(
-    api_key=settings.cursor_api_key,
-    model=build_cursor_model_selection(settings.cursor_model, settings.cursor_model_params),
-    local=LocalAgentOptions(cwd="/app", setting_sources=[]),
-    mcp_servers={
-        "paperless": StdioMcpServerConfig(
-            command="/usr/local/bin/paperless-ngx-mcp",
-            args=["mcp"],
-            env={
-                "PAPERLESS_URL": settings.paperless_url,
-                "PAPERLESS_TOKEN": settings.paperless_api_token,
-            },
-        ),
-    },
-)
+```env
+AGENT_PROVIDER=cursor
+CURSOR_API_KEY=cursor_dein_api_key
+CURSOR_MODEL=composer-2.5
+CURSOR_MODEL_PARAMS=fast:false
 ```
 
-### Codex CLI
+| Variable | Pflicht | Beschreibung |
+|---|---|---|
+| `CURSOR_API_KEY` | ja | [Cursor API Key](https://cursor.com/dashboard/integrations) |
+| `CURSOR_MODEL` | nein | Modell-ID (Standard: `composer-2.5`) |
+| `CURSOR_MODEL_PARAMS` | nein | Parameter als `key:value,key:value` (Standard: `fast:false`) |
+| `CURSOR_LIST_MODELS_ON_STARTUP` | nein | Modelle beim Start loggen (Standard: `false`) |
 
-Der Codex-Provider startet `codex exec` im Container (non-interactive). Beim Start wird `$CODEX_HOME/config.toml` mit Paperless-MCP und Sandbox-Einstellungen generiert.
+### codex
 
-Typische günstige Einstellung:
+Startet `codex exec` non-interactive. Beim Start wird `$CODEX_HOME/config.toml` mit Paperless-MCP erzeugt. Prompt: `prompts/03-tag-document-tax.md`.
 
 ```env
 AGENT_PROVIDER=codex
+CODEX_API_KEY=sk-dein-openai-key
 CODEX_MODEL=gpt-5.4-mini
 CODEX_REASONING_EFFORT=low
 CODEX_MODEL_VERBOSITY=low
@@ -292,6 +203,45 @@ CODEX_NETWORK_ACCESS=true
 ```
 
 `CODEX_NETWORK_ACCESS=true` ist nötig, damit Codex die Paperless-API über MCP erreichen kann.
+
+| Variable | Pflicht | Beschreibung |
+|---|---|---|
+| `CODEX_API_KEY` | ja | OpenAI API Key für Codex CLI |
+| `CODEX_MODEL` | nein | Modell (Standard: `gpt-5.4-mini`) |
+| `CODEX_REASONING_EFFORT` | nein | `none`/`minimal`/`low`/`medium`/`high`/`xhigh` (Standard: `low`) |
+| `CODEX_MODEL_VERBOSITY` | nein | `low`/`medium`/`high` (Standard: `low`) |
+| `CODEX_APPROVAL_POLICY` | nein | Standard: `never` |
+| `CODEX_SANDBOX` | nein | Standard: `workspace-write` |
+| `CODEX_NETWORK_ACCESS` | nein | Standard: `true` |
+| `CODEX_COMMAND` | nein | CLI-Pfad (Standard: `codex`) |
+| `CODEX_HOME` | nein | Config-Verzeichnis (Standard: `/data/codex`) |
+
+### openrouter
+
+Kein Tool-Calling. Python lädt Kontext über die Paperless REST-API, ruft OpenRouter in drei Schritten auf (Klassifikation → Tags → Steuer), schreibt Ergebnisse deterministisch zurück.
+
+Prompts unter `prompts/openrouter/` (JSON-only, kurz).
+
+```env
+AGENT_PROVIDER=openrouter
+OPENROUTER_API_KEY=sk-or-v1-dein-key
+OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+```
+
+| Variable | Pflicht | Beschreibung |
+|---|---|---|
+| `OPENROUTER_API_KEY` | ja | [OpenRouter API Key](https://openrouter.ai/keys) |
+| `OPENROUTER_MODEL` | nein | Modell-Slug (Standard: `nvidia/nemotron-3-ultra-550b-a55b:free`) |
+| `OPENROUTER_BASE_URL` | nein | API-URL (Standard: `https://openrouter.ai/api/v1`) |
+| `OPENROUTER_HTTP_REFERER` | nein | Optionaler Ranking-Header |
+| `OPENROUTER_APP_NAME` | nein | Optionaler `X-Title`-Header |
+| `OPENROUTER_MAX_CONTENT_CHARS` | nein | OCR-Text kürzen (Standard: `50000`) |
+
+Hinweise:
+
+- Free-Modelle können Rate Limits und schwächere Qualität haben.
+- Modell sollte zuverlässig strukturiertes JSON liefern ([OpenRouter Models](https://openrouter.ai/models)).
+- Nicht parallel mit Cursor/Codex auf denselben Workflow betreiben.
 
 ### Lokale Entwicklung (ohne Docker)
 
@@ -302,13 +252,11 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-`paperless-ngx-mcp` installieren (Go):
+Für Cursor/Codex zusätzlich `paperless-ngx-mcp` installieren (Go):
 
 ```bash
 go install github.com/freeformz/paperless-ngx-mcp@latest
 ```
-
-Umgebungsvariablen:
 
 ```bash
 export WEBHOOK_SECRET=test
@@ -316,97 +264,60 @@ export AGENT_PROVIDER=cursor
 export CURSOR_API_KEY=cursor_...
 export PAPERLESS_BASE_URL=http://localhost:8000
 export PAPERLESS_API_TOKEN=dein-token
-export PAPERLESS_MCP_COMMAND=$HOME/go/bin/paperless-ngx-mcp   # Windows: Pfad anpassen
-export PROMPT_TEMPLATE_PATH=../../prompts/01-tag-document.md
+export PAPERLESS_MCP_COMMAND=$HOME/go/bin/paperless-ngx-mcp
+export PROMPT_TEMPLATE_PATH=../../prompts/03-tag-document-tax.md
 
-# Codex lokal:
-# export AGENT_PROVIDER=codex
-# export CODEX_API_KEY=sk-...
-# export CODEX_COMMAND=codex
+# OpenRouter lokal:
+# export AGENT_PROVIDER=openrouter
+# export OPENROUTER_API_KEY=sk-or-v1-...
 
-uvicorn app.main:app --reload --port 8081
+uvicorn app.main:app --reload --port 8083
 ```
 
-## API-Endpunkte
-
-| Methode | Pfad | Beschreibung |
-|---|---|---|
-| `GET` | `/health` | Healthcheck inkl. `pending_jobs` und `queued_jobs` |
-| `POST` | `/webhook` | Asynchron – antwortet sofort mit `202`, Tagging im Hintergrund |
-| `POST` | `/webhook/sync` | Synchron – wartet auf Agent-Ergebnis (nur für Tests) |
-
-**Authentifizierung:** Query-Parameter `?secret=...` oder Header `X-Webhook-Secret`.
-
-## Prompt anpassen
-
-Jede Instanz lädt ihr Prompt-Template über `PROMPT_TEMPLATE` (Dateiname unter `prompts/`, z. B. `02-tag-tax.md`) oder alternativ über den vollen Pfad `PROMPT_TEMPLATE_PATH` (für lokale Entwicklung).
-
-In Docker wird der Pfad automatisch zu `/app/prompts/<PROMPT_TEMPLATE>` aufgelöst. Container heißen `paperless-ai-tagger-<PROMPT_TEMPLATE>` (z. B. `paperless-ai-tagger-02-tag-tax.md`).
-
-Verfügbare Platzhalter in allen Prompt-Templates:
-
-| Platzhalter | Quelle |
-|---|---|
-| `{{document_id}}` | Aus `doc_url` extrahiert |
-| `{{doc_title}}` | Webhook-Payload |
-| `{{correspondent}}` | Webhook-Payload |
-| `{{document_type}}` | Webhook-Payload |
-| `{{doc_url}}` | Webhook-Payload |
-
-Der Prompt wird beim Image-Build ins Container-Image kopiert. Nach Änderungen am Prompt Image neu bauen:
-
-```bash
-docker compose up -d --build
-```
-
-In Portainer: Stack **Pull and redeploy** (mit Rebuild).
-
-## Wichtige Hinweise
-
-### Keine Endlosschleife
-
-- **Workflow 1 (Stufe 01)** nur auf **„Document Added“** triggern, nicht auf „Document Updated“.
-- **Workflow 2 (Stufe 02)** bewusst auf **„Document Updated“** mit Filter `ai-tag-document`, ohne `ai-tag-tax` — so startet die Steuerprüfung erst nach abgeschlossener Klassifikation.
-- Workflow 2 setzt `ai-tag-tax` und löst damit keine erneute Steuerprüfung aus.
+## Betrieb
 
 ### Job-Warteschlange
 
-Eingehende Webhooks werden nicht parallel unbegrenzt gestartet. Jede Instanz verarbeitet Jobs über eine interne Queue mit `MAX_CONCURRENT_JOBS` (Standard: `1` = strikt nacheinander).
+`MAX_CONCURRENT_JOBS` begrenzt parallele Tagging-Jobs (Standard: `1`). `/health` zeigt `pending_jobs` und `queued_jobs`.
 
-- Bulk-Import (z. B. Postfach mit vielen Dokumenten): Paperless feuert viele Webhooks, der Receiver antwortet jeweils mit `202` und arbeitet die Jobs kontrolliert ab.
-- Doppelte Webhooks für dieselbe Dokument-ID während ein Job läuft oder wartet: Antwort `skipped` mit `reason: already_queued`.
-- `/health` zeigt `pending_jobs` (wartend + laufend) und `queued_jobs` (nur wartend).
-
-Die Queue liegt im Arbeitsspeicher — bei Container-Neustart gehen noch nicht verarbeitete Jobs verloren. Bereits abgeschlossene Jobs bleiben über Dedup geschützt.
+Die Queue liegt im Arbeitsspeicher — bei Container-Neustart gehen noch nicht verarbeitete Jobs verloren. Abgeschlossene Jobs bleiben über Dedup geschützt.
 
 ### Deduplizierung
 
-Bereits verarbeitete Dokument-IDs werden pro Instanz für `DEDUP_TTL_HOURS` (Standard: 24 h) übersprungen. Jede Instanz hat ein eigenes Volume (`webhook-data-01-tag-document`, `webhook-data-02-tag-tax`, `webhook-data-03-tag-document-tax`), damit parallele Pipelines sich nicht gegenseitig Dedup-Einträge teilen.
+Bereits verarbeitete Dokument-IDs werden für `DEDUP_TTL_HOURS` (Standard: 24 h) übersprungen. Einträge liegen in `/data/processed_documents.json`.
+
+Einzelnes Dokument für einen erneuten Lauf entfernen (im Container):
+
+```bash
+python -c "import json; from pathlib import Path; p = Path('/data/processed_documents.json'); data = json.loads(p.read_text(encoding='utf-8')); data.pop('1028', None); p.write_text(json.dumps(data), encoding='utf-8'); print('Remaining:', data)"
+```
+
+`1028` durch die gewünschte Dokument-ID ersetzen. Vorher prüfen: `cat /data/processed_documents.json`.
+
+Alternativ für Tests: `POST /webhook/sync` prüft Dedup nicht beim Start (markiert nach erfolgreichem Lauf erneut).
 
 ### Sicherheit
 
-- **Paperless-API-Token** liegt im webhook-receiver-Container (für stdio-MCP) – nur im internen Netz betreiben.
+- **Paperless-API-Token** liegt im webhook-receiver-Container — nur im internen Netz betreiben.
 - **Webhook-Secret** lang und zufällig wählen.
 - Paperless-API-Token mit minimalen Rechten (eigener User).
-- `WEBHOOK_PORT_01` / `WEBHOOK_PORT_02` / `WEBHOOK_PORT_03` nur nach Bedarf nach außen exposen; Reverse Proxy mit TLS empfohlen.
+- `WEBHOOK_PORT_03` nur nach Bedarf nach außen exposen; Reverse Proxy mit TLS empfohlen.
 
 ### Kosten
 
-Jedes neue Dokument löst einen Agenten-Lauf aus (Cursor oder Codex). Bei vielen Uploads Kosten und Rate Limits beachten.
+Jedes neue Dokument löst einen oder mehrere Modell-Aufrufe aus. Bei vielen Uploads Kosten und Rate Limits beachten.
 
-| Ziel | Cursor | Codex |
-|---|---|---|
-| möglichst günstig | `CURSOR_MODEL_PARAMS=fast:true` | `CODEX_MODEL=gpt-5.4-mini`, `CODEX_REASONING_EFFORT=low` |
-| ausgewogen | `fast:false` | `CODEX_MODEL=gpt-5.4`, `CODEX_REASONING_EFFORT=medium` |
-| maximale Qualität | `fast:false` | `CODEX_REASONING_EFFORT=high` |
+| Ziel | Cursor | Codex | OpenRouter |
+|---|---|---|---|
+| möglichst günstig | `CURSOR_MODEL_PARAMS=fast:true` | `CODEX_MODEL=gpt-5.4-mini`, `CODEX_REASONING_EFFORT=low` | Free-Modell oder `openai/gpt-4o-mini` |
+| ausgewogen | `fast:false` | `CODEX_MODEL=gpt-5.4`, Effort `medium` | stärkeres Tool-/JSON-Modell |
+| maximale Qualität | `fast:false` | Effort `high` | Frontier-Modell mit JSON-Zuverlässigkeit |
 
 ### OCR-Timing
 
 Bei „Document Added“ ist OCR in der Regel fertig. Falls der Agent leeren Content sieht, kann ein Retry-Mechanismus ergänzt werden.
 
 ## Paperless mit bestehendem Docker-Stack verbinden
-
-Wenn Paperless bereits in einem eigenen Compose-Stack läuft, zwei Optionen:
 
 **Option A – externes Netzwerk:**
 
@@ -422,38 +333,25 @@ networks:
 
 **Option B – Webhook über Host-IP:**
 
-Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
+Paperless sendet Webhook an `http://<server-ip>:8083/webhook?secret=...`.
 
-## Umgebungsvariablen
+## Umgebungsvariablen (gemeinsam)
 
 | Variable | Pflicht | Beschreibung |
 |---|---|---|
 | `PAPERLESS_BASE_URL` | ja | URL der Paperless-Instanz (Alias: `PAPERLESS_URL`) |
 | `PAPERLESS_API_TOKEN` | ja | API-Token für Paperless (Alias: `PAPERLESS_TOKEN`) |
-| `AGENT_PROVIDER` | nein | Agent-Backend: `cursor` (Standard) oder `codex` |
-| `CURSOR_API_KEY` | bei `cursor` | Cursor API Key |
-| `CURSOR_MODEL` | nein | Cursor-Modell (Standard: `composer-2.5`) |
-| `CURSOR_MODEL_PARAMS` | nein | Cursor-Parameter als `key:value,key:value` (Standard: `fast:false`) |
-| `CURSOR_LIST_MODELS_ON_STARTUP` | nein | Beim Start Cursor-Modelle loggen (Standard: `false`) |
-| `CODEX_API_KEY` | bei `codex` | OpenAI API Key für Codex CLI |
-| `CODEX_MODEL` | nein | Codex-Modell (Standard: `gpt-5.4-mini`) |
-| `CODEX_REASONING_EFFORT` | nein | Codex-Aufwand: `minimal`/`low`/`medium`/`high`/`xhigh` (Standard: `low`) |
-| `CODEX_MODEL_VERBOSITY` | nein | Codex-Ausgabe: `low`/`medium`/`high` (Standard: `low`) |
-| `CODEX_APPROVAL_POLICY` | nein | Codex-Freigaben (Standard: `never`) |
-| `CODEX_SANDBOX` | nein | Codex-Sandbox (Standard: `workspace-write`) |
-| `CODEX_NETWORK_ACCESS` | nein | Netzwerk in Sandbox (Standard: `true`, für Paperless-API) |
-| `CODEX_COMMAND` | nein | Pfad zur Codex-CLI (Standard: `codex`) |
-| `CODEX_HOME` | nein | Codex-Konfigurationsverzeichnis (Standard: `/data/codex`) |
+| `AGENT_PROVIDER` | nein | `cursor` (Standard), `codex` oder `openrouter` |
 | `WEBHOOK_SECRET` | ja | Secret für Webhook-Authentifizierung |
-| `WEBHOOK_PORT_01` | nein | Port für Klassifikation / Stufe 01 (Standard: `8081`) |
-| `WEBHOOK_PORT_02` | nein | Port für Steuerprüfung / Stufe 02 (Standard: `8082`) |
-| `WEBHOOK_PORT_03` | nein | Port für Kombi Klassifikation + Steuer / Stufe 03 (Standard: `8083`) |
-| `PROMPT_TEMPLATE` | nein | Prompt-Dateiname unter `prompts/` (Standard: `01-tag-document.md`) |
-| `PROMPT_TEMPLATE_PATH` | nein | Voller Pfad zum Prompt (überschreibt `PROMPT_TEMPLATE`) |
-| `PAPERLESS_MCP_COMMAND` | nein | Pfad zum MCP-Binary (Standard: `/usr/local/bin/paperless-ngx-mcp`) |
+| `WEBHOOK_PORT_03` | nein | Host-Port (Standard: `8083`) |
+| `PROMPT_TEMPLATE` | nein | MCP-Prompt unter `prompts/` (Standard: `03-tag-document-tax.md`) |
+| `PROMPT_TEMPLATE_PATH` | nein | Voller Pfad zum MCP-Prompt (überschreibt `PROMPT_TEMPLATE`) |
+| `PAPERLESS_MCP_COMMAND` | nein | MCP-Binary (Standard: `/usr/local/bin/paperless-ngx-mcp`) |
 | `DEDUP_TTL_HOURS` | nein | Deduplizierungs-Fenster (Standard: `24`) |
-| `MAX_CONCURRENT_JOBS` | nein | Parallele Tagging-Jobs pro Instanz (Standard: `1`) |
+| `MAX_CONCURRENT_JOBS` | nein | Parallele Jobs (Standard: `1`) |
 | `LOG_LEVEL` | nein | Log-Level (Standard: `INFO`) |
+
+Provider-spezifische Variablen: siehe [cursor](#cursor), [codex](#codex), [openrouter](#openrouter).
 
 ## Troubleshooting
 
@@ -461,37 +359,31 @@ Paperless sendet Webhook an `http://<server-ip>:8081/webhook?secret=...`.
 |---|---|
 | `doc_url` leer im Webhook | `PAPERLESS_URL` in Paperless setzen |
 | `401 Invalid webhook secret` | Secret in URL/Header und `.env` abgleichen |
-| Agent startet nicht | Bei `cursor`: `CURSOR_API_KEY` prüfen. Bei `codex`: `CODEX_API_KEY` und `codex --version` im Container |
-| MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver-01-tag-document paperless-ngx-mcp --version` |
+| Agent startet nicht | Provider-Key prüfen (`CURSOR_API_KEY` / `CODEX_API_KEY` / `OPENROUTER_API_KEY`) |
+| MCP-Verbindung fehlgeschlagen | Binary vorhanden? `docker compose exec webhook-receiver-03-tag-document-tax paperless-ngx-mcp --version` |
+| OpenRouter: invalid JSON / run_error | Modell wechseln; Free-Tier Rate Limits prüfen; Logs der drei Steps ansehen |
 | Webhook erreicht Dienst nicht | Docker-Netzwerk / Firewall / `PAPERLESS_WEBHOOKS_ALLOW_INTERNAL_REQUESTS` |
-| Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` prüfen, Workflow-Filter prüfen |
-| Steuerprüfung startet nicht | Workflow 2 auf Port `8082`, Filter `ai-tag-document` ohne `ai-tag-tax` |
-| Doppelte Verarbeitung | Pro Dokument nur Pipeline 01→02 **oder** Stufe 03; Workflow-Filter prüfen |
-| `pip install` schlägt beim Image-Build fehl | Host braucht `linux/amd64` oder `linux/arm64` (kein 32-bit ARM). Genug Speicher/Platz für ~60 MB `cursor-sdk`-Wheel. Build-Log prüfen; bei Proxy `PIP_INDEX_URL` als Build-Arg setzen |
+| Dokument wird doppelt getaggt | `DEDUP_TTL_HOURS` und Workflow-Filter prüfen |
+| `Skipping document … (already processed recently)` | Eintrag in `/data/processed_documents.json` löschen (siehe [Deduplizierung](#deduplizierung)) |
+| `pip install` schlägt beim Image-Build fehl | Host braucht `linux/amd64` oder `linux/arm64`; genug Speicher für `cursor-sdk`-Wheel |
 
-Logs ansehen:
+Logs:
 
 ```bash
-docker compose logs -f webhook-receiver-01-tag-document
-docker compose logs -f webhook-receiver-02-tag-tax
 docker compose logs -f webhook-receiver-03-tag-document-tax
 ```
 
 ## Breaking Changes (Migration)
 
-Bei einem Update von einer älteren Version:
-
 | Alt | Neu |
 |---|---|
-| `prompts/tag-document.md` | `prompts/01-tag-document.md` |
-| `prompts/tag-tax.md` | `prompts/02-tag-tax.md` |
-| Port `8080` (Klassifikation) | Port `8081` |
-| Port `8081` (Steuer) | Port `8082` |
-| `WEBHOOK_PORT_DOCUMENT` / `WEBHOOK_PORT_TAX` | `WEBHOOK_PORT_01` / `WEBHOOK_PORT_02` |
-| Service `webhook-receiver-tag-document` | `webhook-receiver-01-tag-document` |
-| Service `webhook-receiver-tag-tax` | `webhook-receiver-02-tag-tax` |
+| Zwei-Stufen-Pipeline 01→02 (Ports 8081/8082) | Nur Stufe 03 auf Port `8083` |
+| `prompts/01-tag-document.md`, `prompts/02-tag-tax.md` | entfernt; Kombi-Prompt `03-tag-document-tax.md` |
+| Services `webhook-receiver-01-*` / `02-*` | nur `webhook-receiver-03-tag-document-tax` |
+| `WEBHOOK_PORT_01` / `WEBHOOK_PORT_02` | entfernt; `WEBHOOK_PORT_03` |
+| Nur Cursor/Codex | zusätzlich `AGENT_PROVIDER=openrouter` |
 
-Paperless-Webhook-URLs und `.env` entsprechend anpassen, dann `docker compose up -d --build`.
+Paperless-Webhook-URL auf Port `8083` umstellen, alte 01/02-Container stoppen, dann `docker compose up -d --build`.
 
 ## Lizenz
 
@@ -502,3 +394,5 @@ MIT
 - [Paperless-ngx](https://github.com/paperless-ngx/paperless-ngx)
 - [paperless-ngx-mcp](https://github.com/freeformz/paperless-ngx-mcp) von freeformz
 - [Cursor SDK](https://cursor.com/docs/sdk/python)
+- [OpenAI Codex](https://developers.openai.com/codex/)
+- [OpenRouter](https://openrouter.ai/)

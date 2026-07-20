@@ -72,6 +72,14 @@ class CodexAgentProvider:
         if not isinstance(payload, dict):
             return None
 
+        error = payload.get("error")
+        if isinstance(error, str) and error.strip():
+            return error.strip()
+        if isinstance(error, dict):
+            message = error.get("message")
+            if isinstance(message, str) and message.strip():
+                return message.strip()
+
         for key in ("result", "message", "text", "content", "output"):
             value = payload.get(key)
             if isinstance(value, str) and value.strip():
@@ -139,9 +147,13 @@ class CodexAgentProvider:
             args = self._truncate_for_log(
                 tool_event.get("args", tool_event.get("arguments", "")),
             )
-            result = self._truncate_for_log(
-                tool_event.get("result", tool_event.get("output", text or "")),
-            )
+            tool_text = self._extract_text(tool_event)
+            raw_result = tool_event.get("result")
+            if raw_result is None:
+                raw_result = tool_event.get("output")
+            if raw_result is None:
+                raw_result = tool_text or ""
+            result = self._truncate_for_log(raw_result)
             logger.info(
                 "Agent tool %s (document %s) status=%s args=%s result=%s",
                 name,
@@ -150,11 +162,11 @@ class CodexAgentProvider:
                 args,
                 result,
             )
-            if status == "error":
+            if status in {"error", "failed"}:
                 return f"{name}: {result or 'tool call failed'}"
             return None
 
-        if event_type in {"error", "run_error"}:
+        if event_type in {"error", "run_error", "turn.failed"} or item_type == "error":
             return text or "Codex run failed"
 
         if event_type in {"status", "info"} and text:
@@ -205,7 +217,7 @@ class CodexAgentProvider:
                 or item_type in {"assistant_message", "message"}
             ) and text:
                 summary = text
-            if event_type in {"error", "run_error"}:
+            if event_type in {"error", "run_error", "turn.failed"} or item_type == "error":
                 error = text or "Codex run failed"
 
         if not error and stderr.strip():

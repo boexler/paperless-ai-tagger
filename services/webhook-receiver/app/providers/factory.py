@@ -5,14 +5,17 @@ from app.model_params import format_cursor_model_selection
 from app.providers.base import AgentProvider
 from app.providers.codex import CodexAgentProvider
 from app.providers.cursor import CursorAgentProvider
+from app.providers.openrouter import OpenRouterAgentProvider
 
-AgentProviderName = Literal["cursor", "codex"]
+AgentProviderName = Literal["cursor", "codex", "openrouter"]
 
 
 def create_provider(settings: Settings) -> AgentProvider:
     """Create the configured agent provider implementation."""
     if settings.agent_provider == "codex":
         return CodexAgentProvider(settings)
+    if settings.agent_provider == "openrouter":
+        return OpenRouterAgentProvider(settings)
     return CursorAgentProvider(settings)
 
 
@@ -26,6 +29,12 @@ def format_provider_model(settings: Settings) -> str:
         if settings.codex_model_verbosity:
             parts.append(f"verbosity={settings.codex_model_verbosity}")
         return " ".join(parts)
+
+    if settings.agent_provider == "openrouter":
+        return (
+            f"provider=openrouter model={settings.openrouter_model} "
+            f"base_url={settings.openrouter_base_url}"
+        )
 
     model = format_cursor_model_selection(
         settings.cursor_model,

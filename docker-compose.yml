@@ -19,6 +19,12 @@ x-webhook-receiver: &webhook-receiver-base
     CODEX_NETWORK_ACCESS: ${CODEX_NETWORK_ACCESS:-true}
     CODEX_COMMAND: ${CODEX_COMMAND:-codex}
     CODEX_HOME: ${CODEX_HOME:-/data/codex}
+    OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-ultra-550b-a55b:free}
+    OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+    OPENROUTER_HTTP_REFERER: ${OPENROUTER_HTTP_REFERER:-}
+    OPENROUTER_APP_NAME: ${OPENROUTER_APP_NAME:-}
+    OPENROUTER_MAX_CONTENT_CHARS: ${OPENROUTER_MAX_CONTENT_CHARS:-50000}
     PAPERLESS_BASE_URL: ${PAPERLESS_BASE_URL}
     PAPERLESS_API_TOKEN: ${PAPERLESS_API_TOKEN}
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -28,28 +34,6 @@ x-webhook-receiver: &webhook-receiver-base
     - paperless-ai-tagger
 
 services:
-  webhook-receiver-01-tag-document:
-    <<: *webhook-receiver-base
-    container_name: paperless-ai-tagger-01-tag-document.md
-    environment:
-      <<: *webhook-receiver-env
-      PROMPT_TEMPLATE: 01-tag-document.md
-    volumes:
-      - webhook-data-01-tag-document:/data
-    ports:
-      - "${WEBHOOK_PORT_01:-8081}:8080"
-
-  webhook-receiver-02-tag-tax:
-    <<: *webhook-receiver-base
-    container_name: paperless-ai-tagger-02-tag-tax.md
-    environment:
-      <<: *webhook-receiver-env
-      PROMPT_TEMPLATE: 02-tag-tax.md
-    volumes:
-      - webhook-data-02-tag-tax:/data
-    ports:
-      - "${WEBHOOK_PORT_02:-8082}:8080"
-
   webhook-receiver-03-tag-document-tax:
     <<: *webhook-receiver-base
     container_name: paperless-ai-tagger-03-tag-document-tax.md
@@ -66,6 +50,4 @@ networks:
     driver: bridge
 
 volumes:
-  webhook-data-01-tag-document:
-  webhook-data-02-tag-tax:
   webhook-data-03-tag-document-tax:
