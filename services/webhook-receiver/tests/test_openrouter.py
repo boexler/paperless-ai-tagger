@@ -98,6 +98,49 @@ class OpenRouterJsonParsingTests(unittest.TestCase):
             _extract_json_object("not json at all")
 
 
+class OpenRouterClientRetryTests(unittest.TestCase):
+    """Validate retries for empty OpenRouter completions."""
+
+    def test_retries_no_choices_then_succeeds(self) -> None:
+        from app.providers.openrouter.client import OpenRouterClient
+        from app.providers.openrouter.schemas import TaxReviewResult
+
+        with patch.dict(
+            os.environ,
+            _env(AGENT_PROVIDER="openrouter", OPENROUTER_API_KEY="sk-or-test"),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+
+        client = OpenRouterClient(settings)
+        empty = MagicMock()
+        empty.choices = []
+        ok = MagicMock()
+        ok.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content='{"result":"none","tags_to_add":["ai-tag-tax"],'
+                    '"new_tags":[],"needs_review":false,'
+                    '"professional_context":"keine","tax_note":"ok"}',
+                    refusal=None,
+                ),
+                finish_reason="stop",
+            ),
+        ]
+
+        with patch.object(
+            client._client.chat.completions,
+            "create",
+            side_effect=[empty, ok],
+        ), patch("app.providers.openrouter.client.time.sleep") as sleep_mock:
+            with self.assertLogs("app.providers.openrouter.client", level="WARNING") as logs:
+                result = client.complete_json("system", "user", TaxReviewResult)
+
+        self.assertEqual(result.result, "none")
+        sleep_mock.assert_called_once_with(5.0)
+        self.assertTrue(any("no choices" in line for line in logs.output))
+
+
 class OpenRouterOrchestratorTests(unittest.TestCase):
     """Validate multi-step orchestrator apply behavior with mocks."""
 

@@ -19,7 +19,8 @@ T = TypeVar("T", bound=BaseModel)
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
 _EMPTY_RESPONSE_RETRIES = 3
-_EMPTY_RESPONSE_BACKOFF_SECONDS = 2.0
+_EMPTY_RESPONSE_BACKOFF_SECONDS = 5.0
+_RETRYABLE_RESPONSE_MARKERS = ("empty response", "no choices")
 
 
 class OpenRouterClientError(Exception):
@@ -56,10 +57,13 @@ class OpenRouterClient:
                 raise OpenRouterClientError(f"Invalid JSON schema from model: {exc}") from exc
             except OpenRouterClientError as exc:
                 last_error = exc
-                if "empty response" not in str(exc).lower() or attempt >= _EMPTY_RESPONSE_RETRIES:
+                error_text = str(exc).lower()
+                retryable = any(marker in error_text for marker in _RETRYABLE_RESPONSE_MARKERS)
+                if not retryable or attempt >= _EMPTY_RESPONSE_RETRIES:
                     raise
                 logger.warning(
-                    "OpenRouter empty response (attempt %s/%s), retrying in %.1fs: %s",
+                    "OpenRouter retryable empty completion (attempt %s/%s), "
+                    "retrying in %.1fs: %s",
                     attempt,
                     _EMPTY_RESPONSE_RETRIES,
                     _EMPTY_RESPONSE_BACKOFF_SECONDS,
@@ -84,6 +88,11 @@ class OpenRouterClient:
             raise OpenRouterClientError(f"OpenRouter request failed: {exc}") from exc
 
         if not response.choices:
+            logger.warning(
+                "OpenRouter returned no choices (model=%s): %s",
+                self.model,
+                _response_debug_payload(response),
+            )
             raise OpenRouterClientError(
                 f"OpenRouter returned no choices (model={self.model})",
             )
@@ -96,10 +105,40 @@ class OpenRouterClient:
 
         finish_reason = getattr(choice, "finish_reason", None)
         refusal = getattr(message, "refusal", None)
+        logger.warning(
+            "OpenRouter returned empty content (model=%s, finish_reason=%r, refusal=%r): %s",
+            self.model,
+            finish_reason,
+            refusal,
+            _response_debug_payload(response),
+        )
         raise OpenRouterClientError(
             "OpenRouter returned an empty response "
             f"(model={self.model}, finish_reason={finish_reason!r}, refusal={refusal!r})",
         )
+
+
+def _response_debug_payload(response: Any, max_chars: int = 4000) -> str:
+    """Serialize an OpenAI/OpenRouter response for warning logs."""
+    payload: Any
+    try:
+        if hasattr(response, "model_dump"):
+            payload = response.model_dump()
+        elif hasattr(response, "to_dict"):
+            payload = response.to_dict()
+        else:
+            payload = str(response)
+    except Exception as exc:
+        return f"<unserializable response: {exc}>"
+
+    try:
+        text = json.dumps(payload, ensure_ascii=False, default=str)
+    except TypeError:
+        text = str(payload)
+
+    if len(text) > max_chars:
+        return f"{text[:max_chars]}... (truncated, {len(text)} chars)"
+    return text
 
 
 def _message_text(message: Any) -> str:
