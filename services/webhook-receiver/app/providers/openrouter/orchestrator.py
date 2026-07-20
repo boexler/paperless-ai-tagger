@@ -23,7 +23,17 @@ OPENROUTER_PROMPTS_DIR = Path("/app/prompts/openrouter")
 COMBINED_PROMPT_FILE = "03-tag-document-tax.md"
 
 REQUIRED_PROCESS_TAGS = ("ai-tag-document", "ai-tag-tax")
-MAX_NEW_TAGS = 5
+# Process/review/tax markers may always be created; taxonomy new tags are capped.
+EXEMPT_FROM_NEW_TAG_LIMIT = frozenset(
+    name.casefold()
+    for name in (
+        *REQUIRED_PROCESS_TAGS,
+        "ai-review-tag-document",
+        "ai-review-tag-tax",
+        "steuerrelevant",
+    )
+)
+MAX_NEW_TAGS = 2
 
 
 class OpenRouterOrchestratorError(Exception):
@@ -349,7 +359,8 @@ class OpenRouterOrchestrator:
             if existing_id is not None:
                 merged.add(existing_id)
                 continue
-            if new_count >= MAX_NEW_TAGS:
+            counts_toward_limit = name.casefold() not in EXEMPT_FROM_NEW_TAG_LIMIT
+            if counts_toward_limit and new_count >= MAX_NEW_TAGS:
                 notes.append(
                     f'- Neues Tag "{name}" übersprungen (Limit {MAX_NEW_TAGS}).',
                 )
@@ -358,7 +369,8 @@ class OpenRouterOrchestrator:
             merged.add(tag_id)
             tags_by_id[tag_id] = name
             created.append(name)
-            new_count += 1
+            if counts_toward_limit:
+                new_count += 1
 
         for name, tag_id in tags_by_name.items():
             tags_by_id.setdefault(tag_id, name)

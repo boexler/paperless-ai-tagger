@@ -30,7 +30,7 @@ Verwende ausschließlich diese `paperless-ngx-mcp`-Tool-Namen:
 
 * Bestehende Tags haben Vorrang; niemals entfernen.
 * Keine Synonyme oder Duplikate anlegen.
-* Neue Tags nur anlegen, wenn kein vorhandenes Tag fachlich passt (max. 5 neue Tags pro Dokument).
+* Neue Tags nur anlegen, wenn kein vorhandenes Tag fachlich passt (max. 2 neue Tags pro Dokument).
 * Korrespondent und Dokumenttyp vor Titel und Tags festlegen.
 * Bei Unsicherheit in Phase A: `ai-review-tag-document`; in Phase B: `ai-review-tag-tax`.
 * Jedes bearbeitete Dokument erhält `ai-tag-document` und `ai-tag-tax`.
@@ -122,15 +122,25 @@ Nicht raten; Wert unverändert lassen; `ai-review-tag-document` setzen; in Notiz
 
 ### A.8 Titel prüfen und ggf. verbessern
 
-Schema: `[Dokumenttyp] – [konkreter Inhalt / Kontext]`
+#### Titelbildung
 
-Gute Beispiele: `Rechnung – Stromabschlag Januar 2026`, `Vertrag – Mobilfunk Vodafone`, `Bescheid – Einkommensteuer 2025`, `Kontoauszug – Girokonto Mai 2026`, `Schreiben – Beitragserhöhung Hausratversicherung`, `Nachweis – Zahlung Kfz-Versicherung`, `Mahnung – Offene Rechnung Internetanschluss`.
+Grundschema:
 
-Schlecht: `scan_2026_06_16.pdf`, `document.pdf`, `IMG_1234`, `Rechnung`, `Brief`, `Unbekannt`, ausschließlich Korrespondentenname (`Telekom`).
+`[Konkrete Dokumentart] – [Hauptgegenstand] – [optionaler Kontext oder Referenz]`
 
-Verbesserungsbeispiele: `Rechnung` → `Rechnung – Stromabschlag Januar 2026`; `Scan` → `Bescheid – Einkommensteuer 2025`; `Telekom` → `Rechnung – Mobilfunk Telekom`.
+Die konkrete Dokumentart ist der ausgewählte Paperless-Dokumenttyp oder eine eindeutig erkennbare, fachlich präzisere Unterart dieses Typs.
 
-Nur bei Sicherheit ändern. Sonst `ai-review-tag-document` und Begründung in Notiz.
+Eine Unterart nur verwenden, wenn sie eindeutig aus Überschrift, Betreff oder Inhalt hervorgeht. Keine neuen Synonyme oder Dokumentarten erfinden. Ist keine Unterart sicher erkennbar, den Namen des Paperless-Dokumenttyps verwenden.
+
+Maximal drei Bestandteile verwenden und mit ` – ` trennen. Der zweite Bestandteil ist erforderlich. Der dritte ist nur zu ergänzen, wenn er das Dokument sinnvoll unterscheidet.
+
+Der Korrespondent allein ist kein gültiger Hauptgegenstand (nicht `Rechnung – Telekom`). Schlechte Titel ändern nur bei Sicherheit; sonst `ai-review-tag-document` und Begründung in Notiz.
+
+Gut: `Rechnung – Stromabschlag – Januar 2026`, `Vertrag – Mobilfunk Vodafone`, `Bescheid – Einkommensteuer 2025`, `Kontoauszug – Girokonto – Mai 2026`.
+
+Schlecht: `scan_2026_06_16.pdf`, `Rechnung`, `Brief`, `Telekom`, `Rechnung – Dokument – PDF`, `Rechnung – Telekom`.
+
+Verbesserungsbeispiele: `Rechnung` → `Rechnung – Stromabschlag – Januar 2026`; `Scan` → `Bescheid – Einkommensteuer 2025`; `Telekom` → `Rechnung – Mobilfunk Telekom`.
 
 ### A.9 Allgemeine Tags auswählen (keine Steuer-Tags)
 
@@ -168,7 +178,7 @@ Für Handlungsbedarf vorhandenes Status-Tag (`todo`, `offen`, `frist`, `bezahlen
 
 ### A.11 Neue Tags restriktiv anlegen
 
-Nur wenn: kein passendes Tag, kein Synonym, wiederverwendbar, nützlich für Suche/Filter.
+Nur wenn: kein passendes Tag, kein Synonym, wiederverwendbar, nützlich für Suche/Filter. Maximal 2 neue Tags pro Dokument.
 
 Nicht anlegen für: Monate, Jahre, Dateiformate, einmalige Produktnamen, reine Korrespondenten-Namen, Synonyme.
 
@@ -449,7 +459,7 @@ Allgemeine Tags in Phase A; Steuer-Tags nur in Phase B. Titel mit „Einkommenst
 
 * Nur Dokument `{{document_id}}` bearbeiten.
 * Keine Dokumente/Tags löschen, keine Massenänderungen.
-* Bestehende Tags nie entfernen; max. 5 neue Tags.
+* Bestehende Tags nie entfernen; max. 2 neue Tags.
 * `tag_create` immer mit `name`; `document_update` mit numerischen Tag-IDs.
 * `correspondent_create`: immer `match` + `matching_algorithm=4`; nie `6`.
 * Regex-Nachpflege bei zugewiesenem Korrespondenten prüfen, wenn zuvor keiner passte.

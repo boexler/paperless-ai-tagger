@@ -15,19 +15,44 @@ Du bearbeitest ein Paperless-Dokument in **einem** Durchlauf. Antworte **nur** m
 * Neuer Korrespondent braucht immer `match` (Regex aus OCR) und `matching_algorithm=4`.
 * Nie `matching_algorithm=6` setzen.
 * Bei Unsicherheit: Wert unverändert lassen und `classification.needs_review=true`.
-* Titel-Schema: `[Dokumenttyp] – [konkreter Inhalt / Kontext]`.
-* Schlechte Titel ändern nur bei Sicherheit (nicht nur Korrespondentenname oder Dateiname).
+
+### Titelbildung
+
+Grundschema:
+
+`[Konkrete Dokumentart] – [Hauptgegenstand] – [optionaler Kontext oder Referenz]`
+
+Die konkrete Dokumentart ist der ausgewählte Paperless-Dokumenttyp oder eine eindeutig erkennbare, fachlich präzisere Unterart dieses Typs.
+
+Eine Unterart nur verwenden, wenn sie eindeutig aus Überschrift, Betreff oder Inhalt hervorgeht. Keine neuen Synonyme oder Dokumentarten erfinden. Ist keine Unterart sicher erkennbar, den Namen des Paperless-Dokumenttyps verwenden.
+
+Maximal drei Bestandteile und mit ` – ` trennen. Teil 2 ist erforderlich; Teil 3 nur, wenn er das Dokument sinnvoll unterscheidet.
+
+Korrespondent allein ist kein gültiger Hauptgegenstand. Schlechte Titel (Dateiname, nur Typ, nur Korrespondent) nur bei Sicherheit ändern; sonst `classification.needs_review=true`.
+
+Gut: `Rechnung – Stromabschlag – Januar 2026`. Schlecht: `Rechnung – Telekom`, `Rechnung – Dokument – PDF`.
 
 ## Allgemeine Tags
 
 * Primär aus der vorhandenen Tag-Liste wählen (Namen exakt übernehmen).
+* Reihenfolge: exakt passend → allgemeiner passend → keins → nur bei Bedarf neu.
 * Bestehende Dokument-Tags bleiben erhalten (nicht entfernen).
 * In `tags` **keine** Steuer-Tags (`steuerrelevant`, `werbungskosten`, `ai-tag-tax`, `ai-review-tag-tax`, …).
 * Keine Tags, die nur den Dokumenttyp wiederholen.
-* Neue Tags nur wenn kein passendes existiert, wiederverwendbar, max. 5 neue Tags insgesamt.
 * Immer `ai-tag-document` setzen (in `tags.tags_to_add` oder `tags.new_tags`).
-* `ai-review-tag-document` bei Unsicherheit (Titel/Korrespondent/Typ unklar, OCR schlecht, Handlungsbedarf, Duplikatverdacht, …).
-* Nicht anlegen: Monate, Jahre, Dateiformate, einmalige Produktnamen, reine Korrespondenten-Namen.
+* `ai-review-tag-document` bei Unsicherheit (Titel/Korrespondent/Typ unklar, OCR schlecht, Handlungsbedarf, Duplikatverdacht, neuer Tag wäre nötig, …).
+
+### Neue Tags restriktiv anlegen
+
+Nur wenn **alle** gelten: kein vorhandenes Tag passt fachlich, kein Synonym/Duplikat, wiederverwendbar, nützlich für Suche/Filter.
+
+**Maximal 2 neue Tags** pro Dokument insgesamt (`tags.new_tags` + `tax.new_tags`, ohne bereits existierende Namen). Pflicht-Tags (`ai-tag-document`, `ai-tag-tax`, Review-/Steuer-Prozess-Tags) zählen nicht gegen dieses Limit, wenn sie noch fehlen.
+
+Nicht anlegen für: Monate, Jahre, Dateiformate, einmalige Produktnamen, reine Korrespondenten-Namen, Synonyme.
+
+Kein neues Tag, wenn ein vorhandenes allgemeineres Tag reicht (z. B. `Versicherung` statt neu `Hausratversicherung`).
+
+Bei Unsicherheit: **nicht** anlegen, `tags.needs_review=true` / `ai-review-tag-document`, Vorschlag nur in `suggested_tags` oder Notiz (z. B. `Vorschlag: Neues Tag "Pflegeversicherung" prüfen.`).
 
 ## Steuerprüfung
 
@@ -99,3 +124,4 @@ Hinweise:
 * `classification.correspondent.id` nur bei `set_existing`; `name` + `match` bei `create`.
 * `tags.tags_to_add` / `tax.tags_to_add` = Namen aus der vorhandenen Liste.
 * `new_tags` = neu anzulegende Namen (fehlende Pflicht-Tags wie `ai-tag-document` / `ai-tag-tax` hier oder in `tags_to_add`).
+* `suggested_tags` = unsichere Tag-Vorschläge **ohne** Anlegen; lieber Review als falsche Taxonomie.
