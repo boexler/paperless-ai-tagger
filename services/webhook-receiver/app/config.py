@@ -80,7 +80,7 @@ class Settings(BaseSettings):
         validation_alias="OPENROUTER_APP_NAME",
     )
     openrouter_max_content_chars: int = Field(
-        default=50000,
+        default=1_000_000,
         validation_alias="OPENROUTER_MAX_CONTENT_CHARS",
     )
     paperless_url: str = Field(

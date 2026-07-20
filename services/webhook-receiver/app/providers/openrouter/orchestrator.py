@@ -22,6 +22,21 @@ OPENROUTER_PROMPTS_DIR = Path("/app/prompts/openrouter")
 
 REQUIRED_PROCESS_TAGS = ("ai-tag-document", "ai-tag-tax")
 MAX_NEW_TAGS = 5
+TAX_TAG_NAMES = {
+    "steuerrelevant",
+    "werbungskosten",
+    "arbeitsmittel",
+    "fortbildung",
+    "fachliteratur",
+    "homeoffice",
+    "arbeitszimmer",
+    "reisekosten",
+    "fahrtkosten",
+    "bewerbung",
+    "berufsverband",
+    "ai-tag-tax",
+    "ai-review-tag-tax",
+}
 
 
 class OpenRouterOrchestratorError(Exception):
@@ -475,6 +490,11 @@ def _build_tags_user_prompt(
     classification: ClassificationResult,
 ) -> str:
     document = context["document"]
+    general_tags = [
+        tag
+        for tag in context["tags"]
+        if str(tag.get("name") or "").casefold() not in TAX_TAG_NAMES
+    ]
     payload = {
         "document": {
             "id": document.get("id"),
@@ -493,7 +513,7 @@ def _build_tags_user_prompt(
             "content_truncated": context["content_truncated"],
             "content": context["content"],
         },
-        "available_tags": _compact_catalog(context["tags"], ("id", "name")),
+        "available_tags": _compact_catalog(general_tags, ("id", "name")),
         "classification_note": classification.classification_note,
     }
     return (
@@ -525,6 +545,7 @@ def _build_tax_user_prompt(
         },
         "available_tags": _compact_catalog(context["tags"], ("id", "name")),
         "tags_note": tags.tags_note,
+        "classification_note": classification.classification_note,
     }
     return (
         "Prüfe die Steuerrelevanz. Antworte nur mit JSON.\n\n"

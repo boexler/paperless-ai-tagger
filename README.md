@@ -235,7 +235,7 @@ OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 | `OPENROUTER_BASE_URL` | nein | API-URL (Standard: `https://openrouter.ai/api/v1`) |
 | `OPENROUTER_HTTP_REFERER` | nein | Optionaler Ranking-Header |
 | `OPENROUTER_APP_NAME` | nein | Optionaler `X-Title`-Header |
-| `OPENROUTER_MAX_CONTENT_CHARS` | nein | OCR-Text kürzen (Standard: `50000`) |
+| `OPENROUTER_MAX_CONTENT_CHARS` | nein | OCR-Text kürzen (Standard: `1000000`) |
 
 Hinweise:
 
