@@ -19,8 +19,6 @@ from app.providers.openrouter.schemas import (
 logger = logging.getLogger(__name__)
 
 OPENROUTER_PROMPTS_DIR = Path("/app/prompts/openrouter")
-# orchestrator.py -> openrouter -> providers -> app -> webhook-receiver -> services -> repo
-LOCAL_PROMPTS_FALLBACK = Path(__file__).resolve().parents[5] / "prompts" / "openrouter"
 
 REQUIRED_PROCESS_TAGS = ("ai-tag-document", "ai-tag-tax")
 MAX_NEW_TAGS = 5
@@ -534,9 +532,20 @@ def _build_tax_user_prompt(
     )
 
 
+def _local_prompts_fallback() -> Path | None:
+    """Find prompts/openrouter by walking up from this file (local dev checkout)."""
+    for parent in Path(__file__).resolve().parents:
+        candidate = parent / "prompts" / "openrouter"
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
 def _resolve_prompts_dir() -> Path:
-    if OPENROUTER_PROMPTS_DIR.exists():
+    """Prefer Docker path, then a repo-relative prompts/openrouter directory."""
+    if OPENROUTER_PROMPTS_DIR.is_dir():
         return OPENROUTER_PROMPTS_DIR
-    if LOCAL_PROMPTS_FALLBACK.exists():
-        return LOCAL_PROMPTS_FALLBACK
+    local = _local_prompts_fallback()
+    if local is not None:
+        return local
     return OPENROUTER_PROMPTS_DIR
