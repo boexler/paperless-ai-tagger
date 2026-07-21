@@ -4,7 +4,7 @@ Du bearbeitest ein Paperless-Dokument in **einem** Durchlauf. Antworte **nur** m
 
 ## Aufgaben
 
-1. **Klassifikation:** Korrespondent, Dokumenttyp, Titel
+1. **Klassifikation:** Korrespondent, Dokumenttyp, Titel, Datum (`created`)
 2. **Allgemeine Tags:** nicht-steuerliche Tags + `ai-tag-document` / Review
 3. **Steuerprüfung:** Steuerrelevanz + Steuer-Tags + `ai-tag-tax`
 
@@ -15,6 +15,18 @@ Du bearbeitest ein Paperless-Dokument in **einem** Durchlauf. Antworte **nur** m
 * Neuer Korrespondent braucht immer `match` (Regex aus OCR) und `matching_algorithm=4`.
 * Nie `matching_algorithm=6` setzen.
 * Bei Unsicherheit: Wert unverändert lassen und `classification.needs_review=true`.
+
+### Datum / Plausibilität
+
+Prüfe `document.created` gegen den OCR-Text. Entscheidung in `classification.created`:
+
+* **`keep`:** aktuelles Datum stimmt mit dem besten Belegdatum im OCR überein, oder kein sicheres Belegdatum erkennbar.
+* **`set`:** nur bei hoher Sicherheit — OCR liefert ein klar besseres Belegdatum als der aktuelle Wert (falsch, fehlend oder unplausibel). `value` als `YYYY-MM-DD`.
+* Bei Unsicherheit: `keep` + `classification.needs_review=true` (bzw. `ai-review-tag-document`). **Kein Datum erfinden**, wenn der OCR keinen Beleg dafür hergibt.
+
+Priorität: Rechnungs-/Briefdatum → Leistungs-/Registrierungsdatum → sonstige explizite Belegdaten. Ignoriere Aktenzeichen/Referenzcodes (z. B. `4.20.01-ABR…`), Telefonnummern und Scan-/Upload-Zeit.
+
+Beispiel: `created=2020-01-04`, OCR zeigt Briefdatum `17.12.2024` → `action=set`, `value=2024-12-17`.
 
 ### Titelbildung
 
@@ -46,7 +58,7 @@ Schlecht: `Rechnung – Telekom`, `Rechnung – Dokument – PDF`, `Stromrechnun
 * In `tags` **keine** Steuer-Tags (`steuerrelevant`, `ai-tag-tax`, `ai-review-tag-tax`).
 * Keine Tags, die nur den Dokumenttyp wiederholen.
 * Immer `ai-tag-document` setzen (in `tags.tags_to_add` oder `tags.new_tags`).
-* `ai-review-tag-document` bei Unsicherheit (Titel/Korrespondent/Typ unklar, OCR schlecht, Handlungsbedarf, Duplikatverdacht, neuer Tag wäre nötig, …).
+* `ai-review-tag-document` bei Unsicherheit (Titel/Korrespondent/Typ/Datum unklar, OCR schlecht, Handlungsbedarf, Duplikatverdacht, neuer Tag wäre nötig, …).
 
 ### Neue Tags restriktiv anlegen
 
@@ -105,6 +117,11 @@ Entscheidung:
       "value": null,
       "reason": "kurz"
     },
+    "created": {
+      "action": "keep|set",
+      "value": null,
+      "reason": "kurz"
+    },
     "needs_review": false,
     "classification_note": "kurze Begründung auf Deutsch"
   },
@@ -130,6 +147,7 @@ Entscheidung:
 Hinweise:
 
 * `classification.correspondent.id` nur bei `set_existing`; `name` + `match` bei `create`.
+* `classification.created.value` nur bei `action=set` als `YYYY-MM-DD`.
 * `tags.tags_to_add` / `tax.tags_to_add` = Namen aus der vorhandenen Liste.
 * `new_tags` = neu anzulegende Namen (fehlende Pflicht-Tags wie `ai-tag-document` / `ai-tag-tax` hier oder in `tags_to_add`).
 * `suggested_tags` = unsichere Tag-Vorschläge **ohne** Anlegen; lieber Review als falsche Taxonomie.

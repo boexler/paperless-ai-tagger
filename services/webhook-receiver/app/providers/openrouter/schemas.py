@@ -36,12 +36,21 @@ class TitleDecision(BaseModel):
     reason: str = ""
 
 
+class CreatedDateDecision(BaseModel):
+    """LLM decision for document created (Belegdatum) after OCR plausibility check."""
+
+    action: Literal["keep", "set"] = "keep"
+    value: str | None = None
+    reason: str = ""
+
+
 class ClassificationResult(BaseModel):
     """Metadata classification section."""
 
     correspondent: CorrespondentDecision = Field(default_factory=CorrespondentDecision)
     document_type: DocumentTypeDecision = Field(default_factory=DocumentTypeDecision)
     title: TitleDecision = Field(default_factory=TitleDecision)
+    created: CreatedDateDecision = Field(default_factory=CreatedDateDecision)
     needs_review: bool = False
     classification_note: str = ""
 

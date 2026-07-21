@@ -17,6 +17,7 @@ from app.providers.openrouter.orchestrator import OpenRouterOrchestrator
 from app.providers.openrouter.schemas import (
     ClassificationResult,
     CorrespondentDecision,
+    CreatedDateDecision,
     DocumentTaggingResult,
     DocumentTypeDecision,
     TagSelectionResult,
@@ -229,6 +230,95 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
         self.assertIn("Automatische Einordnung:", note)
         self.assertIn("Steuerprüfung:", note)
         self.assertIn("Dokument 42", summary)
+
+    def test_run_sets_created_date_when_valid_iso(self) -> None:
+        """Valid created.set patches document.created and notes the change."""
+        self.paperless.get_document.return_value = {
+            "id": 1118,
+            "title": "Registrierung",
+            "correspondent": None,
+            "document_type": None,
+            "tags": [],
+            "created": "2020-01-04",
+            "content": "Briefdatum 17.12.2024",
+        }
+        self.paperless.list_tags.return_value = [
+            {"id": 20, "name": "ai-tag-document"},
+            {"id": 21, "name": "ai-tag-tax"},
+        ]
+        self.paperless.list_correspondents.return_value = []
+        self.paperless.list_document_types.return_value = []
+        self.paperless.ensure_tag.side_effect = lambda name, tags_by_name: {
+            "ai-tag-document": 20,
+            "ai-tag-tax": 21,
+        }[name]
+
+        self.llm.complete_json.return_value = DocumentTaggingResult(
+            classification=ClassificationResult(
+                correspondent=CorrespondentDecision(action="keep"),
+                document_type=DocumentTypeDecision(action="keep"),
+                title=TitleDecision(action="keep"),
+                created=CreatedDateDecision(
+                    action="set",
+                    value="2024-12-17",
+                    reason="Briefdatum im OCR.",
+                ),
+            ),
+            tags=TagSelectionResult(tags_to_add=["ai-tag-document"]),
+            tax=TaxReviewResult(result="none", tags_to_add=["ai-tag-tax"]),
+        )
+
+        self.orchestrator.run(1118)
+
+        kwargs = self.paperless.update_document.call_args.kwargs
+        self.assertEqual(kwargs["created"], "2024-12-17")
+        note = self.paperless.add_document_note.call_args.args[1]
+        self.assertIn('Datum geändert zu "2024-12-17"', note)
+
+    def test_run_ignores_invalid_created_date(self) -> None:
+        """Invalid created.value must not be patched; run still succeeds."""
+        self.paperless.get_document.return_value = {
+            "id": 7,
+            "title": "X",
+            "correspondent": None,
+            "document_type": None,
+            "tags": [],
+            "created": "2020-01-04",
+            "content": "text",
+        }
+        self.paperless.list_tags.return_value = [
+            {"id": 20, "name": "ai-tag-document"},
+            {"id": 21, "name": "ai-tag-tax"},
+        ]
+        self.paperless.list_correspondents.return_value = []
+        self.paperless.list_document_types.return_value = []
+        self.paperless.ensure_tag.side_effect = lambda name, tags_by_name: {
+            "ai-tag-document": 20,
+            "ai-tag-tax": 21,
+        }[name]
+
+        self.llm.complete_json.return_value = DocumentTaggingResult(
+            classification=ClassificationResult(
+                correspondent=CorrespondentDecision(action="keep"),
+                document_type=DocumentTypeDecision(action="keep"),
+                title=TitleDecision(action="keep"),
+                created=CreatedDateDecision(
+                    action="set",
+                    value="17.12.2024",
+                    reason="falsches Format",
+                ),
+            ),
+            tags=TagSelectionResult(tags_to_add=["ai-tag-document"]),
+            tax=TaxReviewResult(result="none", tags_to_add=["ai-tag-tax"]),
+        )
+
+        summary = self.orchestrator.run(7)
+
+        kwargs = self.paperless.update_document.call_args.kwargs
+        self.assertNotIn("created", kwargs)
+        note = self.paperless.add_document_note.call_args.args[1]
+        self.assertIn("Datum unverändert", note)
+        self.assertIn("Dokument 7", summary)
 
     def test_run_invalid_json_returns_orchestrator_error(self) -> None:
         self.paperless.get_document.return_value = {

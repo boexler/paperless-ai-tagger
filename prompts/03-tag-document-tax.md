@@ -146,6 +146,18 @@ Schlecht: `scan_2026_06_16.pdf`, `Rechnung`, `Brief`, `Telekom`, `Rechnung – D
 
 Verbesserungsbeispiele: `Rechnung` → `Rechnung – Stromabschlag – Januar 2026`; `Scan` → `Bescheid – Einkommensteuer 2025`; `Telekom` → `Rechnung – Mobilfunk – Januar 2026`; `… – E.ON` → `Stromrechnung – Jahresabrechnung 2023/24`.
 
+### A.8b Datum prüfen und ggf. korrigieren (`created`)
+
+Prüfe das Paperless-Feld `created` (Belegdatum) gegen den OCR-Text.
+
+* **Behalten**, wenn das aktuelle Datum mit dem besten Belegdatum im OCR übereinstimmt oder kein sicheres Belegdatum erkennbar ist.
+* **Korrigieren** (`document_update` mit `created` als `YYYY-MM-DD`) nur bei hoher Sicherheit — OCR liefert ein klar besseres Belegdatum als der aktuelle Wert (falsch, fehlend oder unplausibel).
+* Bei Unsicherheit: Datum unverändert lassen, `ai-review-tag-document` setzen, in der Notiz nennen. **Kein Datum erfinden**, wenn der OCR keinen Beleg dafür hergibt.
+
+Priorität: Rechnungs-/Briefdatum → Leistungs-/Registrierungsdatum → sonstige explizite Belegdaten. Ignoriere Aktenzeichen/Referenzcodes (z. B. `4.20.01-ABR…`), Telefonnummern und Scan-/Upload-Zeit.
+
+Beispiel: `created=2020-01-04`, OCR zeigt Briefdatum `17.12.2024` → `created=2024-12-17` setzen.
+
 ### A.9 Allgemeine Tags auswählen (keine Steuer-Tags)
 
 Wähle primär aus `tag_list`. Reihenfolge: exakt passend → allgemeiner passend → keins → nur bei Bedarf neu.
@@ -344,9 +356,9 @@ Parameter:
 
 * `id={{document_id}}`
 * `tags` als JSON-Array numerischer IDs
-* optional `title`, `correspondent`, `document_type` (nur Phase-A-Änderungen, numerische IDs)
+* optional `title`, `correspondent`, `document_type`, `created` (nur Phase-A-Änderungen; `created` als `YYYY-MM-DD`)
 
-Beispiel: `tags="[1,12,34,56]", title="Rechnung – Stromabschlag Januar 2026", correspondent=42, document_type=7`
+Beispiel: `tags="[1,12,34,56]", title="Rechnung – Stromabschlag Januar 2026", correspondent=42, document_type=7, created="2024-12-17"`
 
 `tags` ersetzt die komplette Liste — bestehende Tags zwingend mitgeben. Numerische IDs, nicht Namen.
 
@@ -357,7 +369,7 @@ Mehrzeilig mit **echten Zeilenumbrüchen** (kein Literal `\n`).
 **Abschnitt 1 — Automatische Einordnung:**
 
 * Korrespondent (geändert/plausibel; ggf. Regex angelegt/aktualisiert)
-* Dokumenttyp, Titel
+* Dokumenttyp, Titel, Datum (`created` beibehalten/korrigiert)
 * Tags + Begründung
 * `ai-tag-document`, `ai-review-tag-document`
 * Neue Tags / keine neuen Tags
@@ -376,6 +388,7 @@ Beispiel:
 Automatische Einordnung:
 - Korrespondent nicht geändert, plausibel (Stadtwerke).
 - Dokumenttyp nicht geändert, plausibel (Rechnung). Titel plausibel, nicht geändert.
+- Datum unverändert (stimmt mit Rechnungsdatum überein).
 - Tags ergänzt: Finanzen, Wohnen, Strom, ai-tag-document. Begründung: Stromrechnung Wohnung.
 - ai-tag-document wurde gesetzt.
 - ai-review-tag-document wurde nicht gesetzt: Metadaten plausibel.
@@ -395,6 +408,7 @@ Beispiel mit Steuerrelevanz:
 Automatische Einordnung:
 - Korrespondent nicht geändert, plausibel (MediaMarkt).
 - Dokumenttyp nicht geändert (Rechnung). Titel geändert zu "Rechnung – Monitor Dell U2723QE".
+- Datum geändert zu 2024-12-17 (Briefdatum im OCR; vorheriges Datum unplausibel).
 - Tags ergänzt: EDV, ai-tag-document. Begründung: EDV-Hardware-Rechnung.
 - ai-tag-document wurde gesetzt.
 - ai-review-tag-document wurde nicht gesetzt.
@@ -472,7 +486,7 @@ Allgemeine Tags in Phase A; Steuer-Tags nur in Phase B. Titel mit „Einkommenst
 Kurz auf Deutsch:
 
 * Dokument-ID
-* Korrespondent, Dokumenttyp, Titel (gesetzt/geändert/unverändert)
+* Korrespondent, Dokumenttyp, Titel, Datum (gesetzt/geändert/unverändert)
 * Allgemeine und Steuer-Tags
 * `ai-tag-document`, `ai-review-tag-document`, `ai-tag-tax`, `ai-review-tag-tax`
 * Ergebnis Steuerprüfung + kurze Begründung
@@ -480,4 +494,4 @@ Kurz auf Deutsch:
 
 Beispiel:
 
-`Dokument {{document_id}}: Korrespondent Stadtwerke (unverändert), Typ Rechnung, Titel unverändert. Tags: Finanzen, Wohnen, Strom, ai-tag-document, ai-tag-tax. Steuer: kein klarer Bezug. ai-review-tag-document und ai-review-tag-tax nicht gesetzt.`
+`Dokument {{document_id}}: Korrespondent Stadtwerke (unverändert), Typ Rechnung, Titel unverändert, Datum unverändert. Tags: Finanzen, Wohnen, Strom, ai-tag-document, ai-tag-tax. Steuer: kein klarer Bezug. ai-review-tag-document und ai-review-tag-tax nicht gesetzt.`

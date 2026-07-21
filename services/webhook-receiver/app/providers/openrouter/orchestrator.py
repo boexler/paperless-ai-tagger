@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,8 @@ EXEMPT_FROM_NEW_TAG_LIMIT = frozenset(
     )
 )
 MAX_NEW_TAGS = 2
+# Paperless created field expects an ISO calendar date (YYYY-MM-DD).
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 class OpenRouterOrchestratorError(Exception):
@@ -174,6 +177,9 @@ class OpenRouterOrchestrator:
             else:
                 note_lines.append("- Titel unverändert.")
 
+            created_note = self._apply_created_date(classification, update_fields)
+            note_lines.append(f"- {created_note}")
+
             if classification.classification_note:
                 note_lines.append(f"- {classification.classification_note}")
 
@@ -214,6 +220,28 @@ class OpenRouterOrchestrator:
             f"neu={', '.join(created_names) or 'keine'}."
         )
         return summary
+
+    def _apply_created_date(
+        self,
+        classification: ClassificationResult,
+        update_fields: dict[str, Any],
+    ) -> str:
+        """Apply a validated ISO created date from the LLM, or keep the current value."""
+        decision = classification.created
+        if decision.action != "set" or not decision.value:
+            return "Datum unverändert."
+
+        value = decision.value.strip()
+        if not _ISO_DATE_RE.fullmatch(value):
+            logger.warning(
+                "Ignoring invalid created date from LLM: %r (reason=%r)",
+                decision.value,
+                decision.reason,
+            )
+            return "Datum unverändert (ungültiges Format vom Modell)."
+
+        update_fields["created"] = value
+        return f'Datum geändert zu "{value}".'
 
     def _resolve_correspondent(
         self,
