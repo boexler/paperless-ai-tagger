@@ -2,6 +2,8 @@ FROM ghcr.io/freeformz/paperless-ngx-mcp:0.0.12 AS paperless-mcp
 
 FROM python:3.12-slim-bookworm
 
+ARG GIT_SHA=unknown
+
 WORKDIR /app
 
 COPY --from=paperless-mcp /paperless-ngx-mcp /usr/local/bin/paperless-ngx-mcp
@@ -25,6 +27,7 @@ ENV DATA_DIR=/data
 ENV CODEX_HOME=/data/codex
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_ROOT_USER_ACTION=ignore
+ENV GIT_SHA=${GIT_SHA}
 
 RUN mkdir -p /data /data/codex
 

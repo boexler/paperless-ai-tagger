@@ -40,8 +40,9 @@ class OpenRouterClient:
         headers: dict[str, str] = {}
         if settings.openrouter_http_referer:
             headers["HTTP-Referer"] = settings.openrouter_http_referer
-        if settings.openrouter_app_name:
-            headers["X-Title"] = settings.openrouter_app_name
+        app_name = settings.resolved_openrouter_app_name()
+        headers["X-Title"] = app_name
+        logger.info("OpenRouter X-Title=%s", app_name)
 
         self.model = settings.openrouter_model
         self.retry_attempts = settings.openrouter_retry_attempts

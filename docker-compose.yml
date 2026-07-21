@@ -2,6 +2,8 @@ x-webhook-receiver: &webhook-receiver-base
   build:
     context: .
     dockerfile: services/webhook-receiver/Dockerfile
+    args:
+      GIT_SHA: ${GIT_SHA:-unknown}
   restart: unless-stopped
   environment: &webhook-receiver-env
     WEBHOOK_SECRET: ${WEBHOOK_SECRET}

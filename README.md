@@ -70,9 +70,19 @@ Provider-spezifische Keys und Modelle: siehe Unterkapitel unter [Agent-Provider]
 
 ### 2. Stack starten
 
+OpenRouter-App-Name im Image enthält den Short-Commit (Build-Arg `GIT_SHA`):
+
 ```bash
-docker compose up -d --build
+GIT_SHA=$(git rev-parse --short HEAD) docker compose up -d --build
 ```
+
+Windows (PowerShell):
+
+```powershell
+$env:GIT_SHA = (git rev-parse --short HEAD); docker compose up -d --build
+```
+
+Ohne `GIT_SHA` wird `unknown` eingebettet (`paperless-ai-tagger@unknown`).
 
 | Instanz | Container | Port | Prompt (Cursor/Codex) |
 |---|---|---|---|
@@ -232,15 +242,17 @@ OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 | `OPENROUTER_MODEL` | nein | Modell-Slug (Standard: `nvidia/nemotron-3-ultra-550b-a55b:free`) |
 | `OPENROUTER_BASE_URL` | nein | API-URL (Standard: `https://openrouter.ai/api/v1`) |
 | `OPENROUTER_HTTP_REFERER` | nein | Optionaler Ranking-Header |
-| `OPENROUTER_APP_NAME` | nein | Optionaler `X-Title`-Header |
+| `OPENROUTER_APP_NAME` | nein | Optionaler `X-Title`-Override (Standard: `paperless-ai-tagger@<GIT_SHA>`) |
 | `OPENROUTER_MAX_CONTENT_CHARS` | nein | OCR-Text kürzen (Standard: `1000000`) |
 | `OPENROUTER_RETRY_ATTEMPTS` | nein | Completion-Versuche bei leerer/überlasteter Antwort (Standard: `3`) |
 | `OPENROUTER_RETRY_BACKOFF_SECONDS` | nein | Basis für lineares Backoff in Sekunden (Standard: `5` → 5s, 10s, 15s) |
+| `GIT_SHA` | nein | Short-Commit als Docker-Build-Arg (Standard: `unknown`) |
 
 Hinweise:
 
 - Free-Modelle können Rate Limits und schwächere Qualität haben.
 - Bei ausgeschöpften Retries setzt der Dienst das Tag `ai-error` und eine Notiz am Dokument.
+- OpenRouter zeigt den App-Namen aus dem `X-Title`-Header (Standard inkl. Build-`GIT_SHA`).
 - Modell sollte zuverlässig strukturiertes JSON liefern ([OpenRouter Models](https://openrouter.ai/models)).
 - Nicht parallel mit Cursor/Codex auf denselben Workflow betreiben.
 
