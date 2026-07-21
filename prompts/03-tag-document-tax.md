@@ -134,13 +134,17 @@ Eine Unterart nur verwenden, wenn sie eindeutig aus Überschrift, Betreff oder I
 
 Maximal drei Bestandteile verwenden und mit ` – ` trennen. Der zweite Bestandteil ist erforderlich. Der dritte ist nur zu ergänzen, wenn er das Dokument sinnvoll unterscheidet.
 
-Der Korrespondent allein ist kein gültiger Hauptgegenstand (nicht `Rechnung – Telekom`). Schlechte Titel ändern nur bei Sicherheit; sonst `ai-review-tag-document` und Begründung in Notiz.
+**Korrespondent nie im Titel.** Der Absender steckt bereits im Metadatum „Korrespondent“ und erscheint im Dateinamen — ihn im Titel zu wiederholen ist redundant (`… – Telekom`, `… – E.ON`, `… – Kirchner GmbH` sind falsch).
 
-Gut: `Rechnung – Stromabschlag – Januar 2026`, `Vertrag – Mobilfunk Vodafone`, `Bescheid – Einkommensteuer 2025`, `Kontoauszug – Girokonto – Mai 2026`.
+Der Korrespondent allein ist kein gültiger Hauptgegenstand. Teil 2 muss der konkrete Inhalt sein (Produkt, Leistung, Zeitraum, Vertragsgegenstand) — nicht eine vage Warengruppe wie „Haushaltsartikel“, wenn Artikel/Marken erkennbar sind. Teil 3 nur für unterscheidende Referenzen (Bestell-/Rechnungsnummer, Monat/Jahr, Verbrauchsstelle), nie für den Korrespondenten.
 
-Schlecht: `scan_2026_06_16.pdf`, `Rechnung`, `Brief`, `Telekom`, `Rechnung – Dokument – PDF`, `Rechnung – Telekom`.
+Schlechte Titel ändern nur bei Sicherheit; sonst `ai-review-tag-document` und Begründung in Notiz.
 
-Verbesserungsbeispiele: `Rechnung` → `Rechnung – Stromabschlag – Januar 2026`; `Scan` → `Bescheid – Einkommensteuer 2025`; `Telekom` → `Rechnung – Mobilfunk Telekom`.
+Gut: `Rechnung – Stromabschlag – Januar 2026`, `Stromrechnung – Jahresabrechnung 2023/24`, `Rechnung – Festool Akku-Dämmstoffsäge ISC 240 EB-Basic`, `Bescheid – Einkommensteuer 2025`, `Kontoauszug – Girokonto – Mai 2026`, `Rechnung – Miniaturkabel Litze LIFY – RE-133101`.
+
+Schlecht: `scan_2026_06_16.pdf`, `Rechnung`, `Brief`, `Telekom`, `Rechnung – Dokument – PDF`, `Rechnung – Telekom`, `Stromrechnung – Abrechnung 2023/24 – E.ON`, `Rechnung – Küchen- und Haushaltsartikel – Bestellung 123`.
+
+Verbesserungsbeispiele: `Rechnung` → `Rechnung – Stromabschlag – Januar 2026`; `Scan` → `Bescheid – Einkommensteuer 2025`; `Telekom` → `Rechnung – Mobilfunk – Januar 2026`; `… – E.ON` → `Stromrechnung – Jahresabrechnung 2023/24`.
 
 ### A.9 Allgemeine Tags auswählen (keine Steuer-Tags)
 

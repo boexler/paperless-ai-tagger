@@ -28,9 +28,15 @@ Eine Unterart nur verwenden, wenn sie eindeutig aus Überschrift, Betreff oder I
 
 Maximal drei Bestandteile und mit ` – ` trennen. Teil 2 ist erforderlich; Teil 3 nur, wenn er das Dokument sinnvoll unterscheidet.
 
-Korrespondent allein ist kein gültiger Hauptgegenstand. Schlechte Titel (Dateiname, nur Typ, nur Korrespondent) nur bei Sicherheit ändern; sonst `classification.needs_review=true`.
+**Korrespondent nie im Titel.** Der Absender steckt bereits im Metadatum „Korrespondent“ und erscheint im Dateinamen — ihn im Titel zu wiederholen ist redundant (`… – Telekom`, `… – E.ON`, `… – Kirchner GmbH` sind falsch).
 
-Gut: `Rechnung – Stromabschlag – Januar 2026`. Schlecht: `Rechnung – Telekom`, `Rechnung – Dokument – PDF`.
+Korrespondent allein ist kein gültiger Hauptgegenstand. Teil 2 muss der konkrete Inhalt sein (Produkt, Leistung, Zeitraum, Vertragsgegenstand) — nicht eine vage Warengruppe wie „Haushaltsartikel“, wenn Artikel/Marken erkennbar sind. Teil 3 nur für unterscheidende Referenzen (Bestell-/Rechnungsnummer, Monat/Jahr, Verbrauchsstelle), nie für den Korrespondenten.
+
+Schlechte Titel (Dateiname, nur Typ, nur Korrespondent) nur bei Sicherheit ändern; sonst `classification.needs_review=true`.
+
+Gut: `Rechnung – Stromabschlag – Januar 2026`, `Stromrechnung – Jahresabrechnung 2023/24`, `Rechnung – Festool Akku-Dämmstoffsäge ISC 240 EB-Basic`, `Rechnung – Miniaturkabel Litze LIFY – RE-133101`.
+
+Schlecht: `Rechnung – Telekom`, `Rechnung – Dokument – PDF`, `Stromrechnung – Abrechnung 2023/24 – E.ON`, `Rechnung – Küchen- und Haushaltsartikel – Bestellung 123`.
 
 ## Allgemeine Tags
 
