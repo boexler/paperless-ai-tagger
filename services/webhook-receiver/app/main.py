@@ -41,11 +41,13 @@ async def lifespan(app: FastAPI):
     await job_queue.start()
     app.state.job_queue = job_queue
     logger.info(
-        "Webhook receiver started (%s, prompt: %s, path: %s, max_concurrent_jobs: %s)",
+        "Webhook receiver started (%s, prompt: %s, path: %s, max_concurrent_jobs: %s, "
+        "dedup_skip_check: %s)",
         format_provider_model(settings),
         settings.prompt_template,
         settings.prompt_template_path,
         settings.max_concurrent_jobs,
+        settings.dedup_skip_check,
     )
     yield
     await job_queue.stop()
@@ -116,7 +118,8 @@ async def webhook(
         )
 
     store: ProcessedDocumentStore = request.app.state.store
-    if store.was_processed_recently(document_id):
+    settings: Settings = request.app.state.settings
+    if not settings.dedup_skip_check and store.was_processed_recently(document_id):
         logger.info("Skipping document %s (already processed recently)", document_id)
         return JSONResponse(
             status_code=202,

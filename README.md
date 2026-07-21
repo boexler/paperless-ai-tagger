@@ -287,6 +287,8 @@ Die Queue liegt im Arbeitsspeicher — bei Container-Neustart gehen noch nicht v
 
 Bereits verarbeitete Dokument-IDs werden für `DEDUP_TTL_HOURS` (Standard: 24 h) übersprungen. Einträge liegen in `/data/processed_documents.json`.
 
+Mit `DEDUP_SKIP_CHECK=true` wird die Skip-Prüfung deaktiviert: bereits bekannte Dokumente werden erneut getaggt. Erfolgreiche Läufe werden weiterhin in `processed_documents.json` geschrieben.
+
 Einzelnes Dokument für einen erneuten Lauf entfernen (im Container):
 
 ```bash
@@ -349,6 +351,7 @@ Paperless sendet Webhook an `http://<server-ip>:8083/webhook?secret=...`.
 | `PROMPT_TEMPLATE_PATH` | nein | Voller Pfad zum MCP-Prompt (überschreibt `PROMPT_TEMPLATE`) |
 | `PAPERLESS_MCP_COMMAND` | nein | MCP-Binary (Standard: `/usr/local/bin/paperless-ngx-mcp`) |
 | `DEDUP_TTL_HOURS` | nein | Deduplizierungs-Fenster (Standard: `24`) |
+| `DEDUP_SKIP_CHECK` | nein | Skip-Prüfung deaktivieren, Schreiben bleibt aktiv (Standard: `false`) |
 | `MAX_CONCURRENT_JOBS` | nein | Parallele Jobs (Standard: `1`) |
 | `LOG_LEVEL` | nein | Log-Level (Standard: `INFO`) |
 
