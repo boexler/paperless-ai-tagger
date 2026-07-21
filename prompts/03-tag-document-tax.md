@@ -150,7 +150,7 @@ Verbesserungsbeispiele: `Rechnung` → `Rechnung – Stromabschlag – Januar 20
 
 Wähle primär aus `tag_list`. Reihenfolge: exakt passend → allgemeiner passend → keins → nur bei Bedarf neu.
 
-Keine Tags, die nur den Dokumenttyp wiederholen. In Phase A **keine** Steuer-Tags (`steuerrelevant`, `werbungskosten`, `ai-tag-tax` usw.) — Phase B übernimmt.
+Keine Tags, die nur den Dokumenttyp wiederholen. In Phase A **keine** Steuer-Tags (`steuerrelevant`, `ai-tag-tax`, `ai-review-tag-tax`) — Phase B übernimmt.
 
 Beispiele: Stromrechnung → `Wohnen`, `Strom`, `Finanzen`; Steuerbescheid → `Behörde`, `wichtig` (ohne steuerliche Tag-Namen).
 
@@ -196,7 +196,7 @@ Nutze Ergebnisse aus Phase A (geladene Tags, `document_get`, gesetzte Metadaten)
 
 ### B.1 Ziel
 
-Prüfe Einkommensteuer-Relevanz (Werbungskosten, Arbeitsmittel, Fortbildung, Fachliteratur, Reisekosten, Bewerbung, Berufsverband, Homeoffice/Arbeitszimmer, sonstige berufliche Ausgaben).
+Prüfe Einkommensteuer-Relevanz (beruflich absetzbare Ausgaben: Arbeitsmittel, Fortbildung, Fachliteratur, Reisekosten, Bewerbung, Berufsverband, Homeoffice/Arbeitszimmer, sonstige berufliche Ausgaben).
 
 Berufliche Kontexte:
 
@@ -207,7 +207,8 @@ Berufliche Kontexte:
 ### B.2 Grundregeln Steuer
 
 * Nur Steuerrelevanz prüfen — **Titel, Korrespondent, Dokumenttyp nicht ändern** (bereits in Phase A).
-* Bestehende Tags behalten; Steuer-Tags ergänzen.
+* Bestehende Tags behalten; bei Relevanz `steuerrelevant` ergänzen.
+* **Einziges fachliches Steuer-Tag:** `steuerrelevant`. Keine Untertags (`werbungskosten`, `arbeitsmittel`, `fortbildung`, Berufsfeld-Tags usw.) anlegen oder setzen — alles Absetzbare nur mit `steuerrelevant` markieren.
 * Keine steuerliche Beratung — nur potenzielle Relevanz markieren.
 * Keine harte Negativentscheidung, wenn spätere Nachschärfung möglich.
 * Kleidung/Textilien nicht automatisch steuerrelevant; im Zweifel `ai-review-tag-tax`.
@@ -215,17 +216,15 @@ Berufliche Kontexte:
 
 ### B.3 Steuer-Tags
 
-Pflicht (anlegen falls fehlend): `steuerrelevant`, `ai-review-tag-tax`, `ai-tag-tax`.
+Nur diese Steuer-/Prozess-Tags (anlegen falls fehlend): `steuerrelevant`, `ai-review-tag-tax`, `ai-tag-tax`.
 
-Optional (nur wenn passend und wiederverwendbar): `werbungskosten`, `arbeitsmittel`, `fortbildung`, `fachliteratur`, `homeoffice`, `arbeitszimmer`, `reisekosten`, `fahrtkosten`, `bewerbung`, `berufsverband`, `softwareentwicklung`, `edv`, `mechatronik`, `industrie`, `schule`, `pädagogik`, `unterrichtsmaterial`, `musik`, `sport`, `kunst`, `sachunterricht`, `förderunterricht`.
-
-Nicht als Standard-Steuer-Tag: `berufskleidung`.
+Keine weiteren Steuer-Untertags anlegen oder setzen.
 
 ### B.4 Steuerliche Relevanz bewerten
 
 #### Transport (Lehrkraft)
 
-Gegenstände zum Transport/Organisation von Unterrichtsmaterial oder Dienstgeräten sind potenzielle Arbeitsmittel. Notebookfach = zusätzlicher Hinweis, keine Voraussetzung. Mode-/Reise-Optik schließt berufliche Nutzung nicht aus. Plausibel → `steuerrelevant` + `arbeitsmittel` (+ `schule`, `pädagogik`); unsicher → `ai-review-tag-tax`. Nicht ablehnen mit „nur Tasche“/„nur Notebookfach“. Eher privat: reines Reise-/Modeprodukt ohne Schul-/Arbeitsbezug.
+Gegenstände zum Transport/Organisation von Unterrichtsmaterial oder Dienstgeräten können absetzbar sein. Notebookfach = zusätzlicher Hinweis, keine Voraussetzung. Mode-/Reise-Optik schließt berufliche Nutzung nicht aus. Plausibel → `steuerrelevant`; unsicher → `ai-review-tag-tax`. Nicht ablehnen mit „nur Tasche“/„nur Notebookfach“. Eher privat: reines Reise-/Modeprodukt ohne Schul-/Arbeitsbezug.
 
 #### A — Steuerlich relevant → `steuerrelevant`
 
@@ -282,7 +281,7 @@ Potenziell steuerlich relevante Hinweise:
 
 **Kleidung/Schutzausrüstung:** nicht automatisch `steuerrelevant`; bei Sicherheitsschuhen, Schutzbrille, Gehörschutz, Helm, Handschuhen → `ai-review-tag-tax`; `steuerrelevant` nur bei eindeutigem Schutz-/Sicherheitsbezug.
 
-Tags: `mechatronik`, `industrie`, `arbeitsmittel`, `fortbildung`, `fachliteratur`, `werbungskosten`.
+Bei Relevanz nur `steuerrelevant` (+ Prozess-Tags) — keine Berufsfeld-/Kostenarten-Tags in Phase B.
 
 #### Software / EDV
 
@@ -292,7 +291,7 @@ Potenziell steuerlich relevante Hinweise:
 * **Dienste/Lizenzen:** Cloud-Dienste, Hosting, Domains, SSL, E-Mail-Hosting, VPN, Softwarelizenzen, IDE, Git/CI/CD, SaaS, PM-/Dokumentations-/Design-/API-/DB-/Test-/Security-Tools
 * **Weiterbildung/Büro:** Fachliteratur, Online-Kurse, Zertifizierungen, Konferenzen, Schreibtisch, Bürostuhl, Monitorarm, Arbeitsplatzbeleuchtung, Homeoffice-Ausstattung, Steuerberatung bei selbständiger/nebenberuflicher IT-Tätigkeit, EDV-Projektrechnungen
 
-Tags: `softwareentwicklung`, `edv`, `arbeitsmittel`, `fortbildung`, `fachliteratur`, `homeoffice`, `werbungskosten`.
+Bei Relevanz nur `steuerrelevant` (+ Prozess-Tags) — keine Berufsfeld-/Kostenarten-Tags in Phase B.
 
 #### Grundschule / Pädagogik
 
@@ -312,18 +311,18 @@ Potenziell steuerlich relevante Hinweise:
 * **Fortbildung:** pädagogische Fortbildung, Erste-Hilfe-Kurs, Inklusion, Diagnostik, Classroom Management, Medienbildung, Fachseminare, Lehrerkongresse
 * **Reisen:** Klassenfahrt, Exkursion, Schullandheim, Fortbildungsreise, Bahn/Hotel/ÖPNV mit schulischem Anlass
 
-Tags: `schule`, `pädagogik`, `unterrichtsmaterial`, `arbeitsmittel`, `fortbildung`, `fachliteratur`, `homeoffice`, `werbungskosten`, `musik`, `sport`, `kunst`, `sachunterricht`, `förderunterricht`.
+Bei Relevanz nur `steuerrelevant` (+ Prozess-Tags) — keine Berufsfeld-/Kostenarten-Tags in Phase B.
 
 ### B.6 Entscheidungslogik
 
-1. Klarer Berufs-/Steuerbezug → `steuerrelevant` + optionale Tags.
+1. Klarer Berufs-/Steuerbezug → `steuerrelevant`.
 2. Möglich, aber unsicher → `ai-review-tag-tax`; `steuerrelevant` nur wenn überwiegend plausibel.
 3. Kein klarer Bezug → `ai-tag-tax`, kein `steuerrelevant`; ggf. `ai-review-tag-tax` für Nachschärfung.
 4. **Immer** `ai-tag-tax` setzen.
-5. Optionale Tags nur wenn existierend oder eindeutig wiederverwendbar.
+5. Keine Steuer-Untertags; Berufskontext nur in der Notiz / `professional_context`.
 6. Gemischte Nutzung → `steuerrelevant` wenn plausibel + `ai-review-tag-tax` für Aufteilung.
 7. Kleidung/Textilien → nicht automatisch `steuerrelevant`; Schutzbezug nur vorsichtig + Review.
-8. Transportmittel (Tasche, Rucksack, Koffer, Organizer …)? → Regel „Transport (Lehrkraft)“; plausibel `steuerrelevant` + `arbeitsmittel`, sonst mindestens `ai-review-tag-tax`.
+8. Transportmittel (Tasche, Rucksack, Koffer, Organizer …)? → Regel „Transport (Lehrkraft)“; plausibel `steuerrelevant`, sonst mindestens `ai-review-tag-tax`.
 9. Fristen/Mahnungen nur steuerlich relevant, wenn Steuerbezug möglich.
 
 ---
@@ -339,8 +338,7 @@ Finale Tag-Liste aus:
 * `ai-tag-document`, `ai-review-tag-document` (falls nötig)
 * `ai-tag-tax` (immer)
 * `steuerrelevant`, `ai-review-tag-tax` (falls nötig)
-* optionalen Steuer-Tags aus Phase B
-* neu erstellten Tag-IDs
+* neu erstellten Tag-IDs (nur Pflicht-/Prozess-Tags, keine Steuer-Untertags)
 
 Parameter:
 
@@ -404,7 +402,7 @@ Automatische Einordnung:
 
 Steuerprüfung:
 - Ergebnis: steuerlich relevant.
-- Tags ergänzt: steuerrelevant, werbungskosten, arbeitsmittel, softwareentwicklung, ai-tag-tax. Begründung: Monitor mit beruflichem Bezug.
+- Tags ergänzt: steuerrelevant, ai-tag-tax. Begründung: Monitor mit beruflichem Bezug.
 - Beruflicher Kontext: Softwareentwicklung / EDV.
 - ai-tag-tax wurde gesetzt.
 - ai-review-tag-tax wurde nicht gesetzt: Einordnung plausibel.
@@ -423,7 +421,7 @@ Automatische Einordnung:
 
 Steuerprüfung:
 - Ergebnis: möglicherweise steuerlich relevant.
-- Tags ergänzt: ai-review-tag-tax, ai-tag-tax. Begründung: Versicherungsbezug unklar, kein eindeutiger Werbungskosten-Beleg.
+- Tags ergänzt: ai-review-tag-tax, ai-tag-tax. Begründung: Versicherungsbezug unklar, kein eindeutiger Berufsausgaben-Beleg.
 - Beruflicher Kontext: keiner eindeutig.
 - ai-tag-tax wurde gesetzt.
 - ai-review-tag-tax wurde gesetzt: steuerlichen Bezug prüfen.

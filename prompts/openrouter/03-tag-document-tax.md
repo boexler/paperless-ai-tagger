@@ -43,7 +43,7 @@ Schlecht: `Rechnung – Telekom`, `Rechnung – Dokument – PDF`, `Stromrechnun
 * Primär aus der vorhandenen Tag-Liste wählen (Namen exakt übernehmen).
 * Reihenfolge: exakt passend → allgemeiner passend → keins → nur bei Bedarf neu.
 * Bestehende Dokument-Tags bleiben erhalten (nicht entfernen).
-* In `tags` **keine** Steuer-Tags (`steuerrelevant`, `werbungskosten`, `ai-tag-tax`, `ai-review-tag-tax`, …).
+* In `tags` **keine** Steuer-Tags (`steuerrelevant`, `ai-tag-tax`, `ai-review-tag-tax`).
 * Keine Tags, die nur den Dokumenttyp wiederholen.
 * Immer `ai-tag-document` setzen (in `tags.tags_to_add` oder `tags.new_tags`).
 * `ai-review-tag-document` bei Unsicherheit (Titel/Korrespondent/Typ unklar, OCR schlecht, Handlungsbedarf, Duplikatverdacht, neuer Tag wäre nötig, …).
@@ -64,18 +64,20 @@ Bei Unsicherheit: **nicht** anlegen, `tags.needs_review=true` / `ai-review-tag-d
 
 Berufliche Kontexte: Mechatroniker/Industrie, Software/EDV, Grundschullehrerin/Pädagogik.
 
+Einziges fachliches Steuer-Tag: `steuerrelevant`. Keine Untertags (kein `werbungskosten`, `arbeitsmittel`, `fortbildung`, …) anlegen oder setzen — alles Absetzbare nur mit `steuerrelevant` markieren.
+
 * Immer `ai-tag-tax` setzen.
-* `steuerrelevant` nur bei klarem Berufs-/Steuerbezug.
+* `steuerrelevant` bei klarem Berufs-/Steuerbezug (Arbeitsmittel, Fortbildung, Fachliteratur, Reise-/Fahrtkosten, Bewerbung, Berufsverband, Homeoffice/Arbeitszimmer, sonstige berufliche Ausgaben).
 * Bei Unsicherheit: `ai-review-tag-tax` (lieber Review als falsch positiv/negativ).
 * Kleidung/Textilien nicht automatisch steuerrelevant.
-* Transportmittel für Unterrichtsmaterial (Tasche, Rucksack, Koffer, Organizer, auch mit Notebookfach) können Arbeitsmittel sein — Mode-Optik schließt Berufsbezug nicht aus.
-* Optionale Tags nur wenn passend: `werbungskosten`, `arbeitsmittel`, `fortbildung`, `fachliteratur`, `homeoffice`, `arbeitszimmer`, `reisekosten`, `fahrtkosten`, `bewerbung`, `berufsverband`, `softwareentwicklung`, `edv`, `mechatronik`, `industrie`, `schule`, `pädagogik`, `unterrichtsmaterial`, `musik`, `sport`, `kunst`, `sachunterricht`, `förderunterricht`.
+* Transportmittel für Unterrichtsmaterial (Tasche, Rucksack, Koffer, Organizer, auch mit Notebookfach) können absetzbar sein — Mode-Optik schließt Berufsbezug nicht aus; bei Plausibilität `steuerrelevant`.
 * Keine steuerliche Beratung — nur potenzielle Relevanz markieren.
+* In `tax.tags_to_add` / `tax.new_tags` nur `steuerrelevant`, `ai-tag-tax`, `ai-review-tag-tax` (je nach Ergebnis) — keine weiteren Steuer-Untertags.
 
 Entscheidung:
 
-* `relevant` → `steuerrelevant` + passende optionale Tags + `ai-tag-tax`
-* `maybe` → `ai-review-tag-tax` + `ai-tag-tax` (steuerrelevant nur wenn überwiegend plausibel)
+* `relevant` → `steuerrelevant` + `ai-tag-tax`
+* `maybe` → `ai-review-tag-tax` + `ai-tag-tax` (`steuerrelevant` nur wenn überwiegend plausibel)
 * `none` → nur `ai-tag-tax` (optional Review zur Nachschärfung)
 
 ## Antwort-Schema
