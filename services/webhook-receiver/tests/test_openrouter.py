@@ -103,7 +103,7 @@ class OpenRouterJsonParsingTests(unittest.TestCase):
 class OpenRouterClientRetryTests(unittest.TestCase):
     """Validate retries for empty OpenRouter completions."""
 
-    def test_retries_no_choices_then_succeeds(self) -> None:
+    def test_retries_no_choices_with_linear_backoff_then_succeeds(self) -> None:
         from app.providers.openrouter.client import OpenRouterClient
         from app.providers.openrouter.schemas import TaxReviewResult
 
@@ -133,13 +133,14 @@ class OpenRouterClientRetryTests(unittest.TestCase):
         with patch.object(
             client._client.chat.completions,
             "create",
-            side_effect=[empty, ok],
+            side_effect=[empty, empty, ok],
         ), patch("app.providers.openrouter.client.time.sleep") as sleep_mock:
             with self.assertLogs("app.providers.openrouter.client", level="WARNING") as logs:
                 result = client.complete_json("system", "user", TaxReviewResult)
 
         self.assertEqual(result.result, "none")
-        sleep_mock.assert_called_once_with(5.0)
+        self.assertEqual(sleep_mock.call_args_list[0].args[0], 5.0)
+        self.assertEqual(sleep_mock.call_args_list[1].args[0], 10.0)
         self.assertTrue(any("no choices" in line for line in logs.output))
 
 
@@ -335,6 +336,63 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             self.orchestrator.run(1)
         self.assertIn("Tagging request failed", str(ctx.exception))
+
+    def test_mark_processing_failure_merges_ai_error_tag(self) -> None:
+        """Failure helper merges ai-error without dropping existing tags."""
+        self.paperless.get_document.return_value = {"id": 1118, "tags": [10, 11]}
+        self.paperless.list_tags.return_value = [
+            {"id": 10, "name": "Inbox"},
+            {"id": 11, "name": "111"},
+        ]
+        self.paperless.ensure_tag.return_value = 99
+
+        self.orchestrator.mark_processing_failure(
+            1118,
+            "OpenRouter returned no choices (model=test)",
+        )
+
+        self.assertEqual(self.paperless.ensure_tag.call_args.args[0], "ai-error")
+        kwargs = self.paperless.update_document.call_args.kwargs
+        self.assertEqual(sorted(kwargs["tags"]), [10, 11, 99])
+        note = self.paperless.add_document_note.call_args.args[1]
+        self.assertIn("KI-Verarbeitung fehlgeschlagen", note)
+        self.assertIn("no choices", note)
+        self.assertIn("ai-error", note)
+
+
+class OpenRouterProviderFailureMarkingTests(unittest.TestCase):
+    """Validate provider invokes failure marking on run errors."""
+
+    def test_tag_document_marks_ai_error_on_run_failure(self) -> None:
+        from app.providers.openrouter import OpenRouterAgentProvider
+        from app.providers.openrouter.orchestrator import OpenRouterOrchestratorError
+
+        with patch.dict(
+            os.environ,
+            _env(AGENT_PROVIDER="openrouter", OPENROUTER_API_KEY="sk-or-test"),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+
+        provider = OpenRouterAgentProvider(settings)
+        orchestrator = MagicMock()
+        orchestrator.run.side_effect = OpenRouterOrchestratorError(
+            "Tagging request failed: OpenRouter returned no choices (model=test)",
+        )
+
+        with patch(
+            "app.providers.openrouter.OpenRouterOrchestrator",
+            return_value=orchestrator,
+        ):
+            result = provider.tag_document(1118)
+
+        self.assertEqual(result.status, "run_error")
+        self.assertIn("no choices", result.error or "")
+        orchestrator.mark_processing_failure.assert_called_once_with(
+            1118,
+            "Tagging request failed: OpenRouter returned no choices (model=test)",
+        )
+        orchestrator.close.assert_called_once()
 
 
 if __name__ == "__main__":

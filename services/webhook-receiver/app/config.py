@@ -83,6 +83,14 @@ class Settings(BaseSettings):
         default=1_000_000,
         validation_alias="OPENROUTER_MAX_CONTENT_CHARS",
     )
+    openrouter_retry_attempts: int = Field(
+        default=3,
+        validation_alias="OPENROUTER_RETRY_ATTEMPTS",
+    )
+    openrouter_retry_backoff_seconds: float = Field(
+        default=5.0,
+        validation_alias="OPENROUTER_RETRY_BACKOFF_SECONDS",
+    )
     paperless_url: str = Field(
         validation_alias=AliasChoices("PAPERLESS_URL", "PAPERLESS_BASE_URL"),
     )
@@ -173,6 +181,22 @@ class Settings(BaseSettings):
         """Require a positive OCR truncation limit."""
         if value < 1:
             raise ValueError("OPENROUTER_MAX_CONTENT_CHARS must be >= 1")
+        return value
+
+    @field_validator("openrouter_retry_attempts")
+    @classmethod
+    def validate_openrouter_retry_attempts(cls, value: int) -> int:
+        """Require at least one OpenRouter completion attempt."""
+        if value < 1:
+            raise ValueError("OPENROUTER_RETRY_ATTEMPTS must be >= 1")
+        return value
+
+    @field_validator("openrouter_retry_backoff_seconds")
+    @classmethod
+    def validate_openrouter_retry_backoff_seconds(cls, value: float) -> float:
+        """Allow zero or positive linear backoff base seconds."""
+        if value < 0:
+            raise ValueError("OPENROUTER_RETRY_BACKOFF_SECONDS must be >= 0")
         return value
 
     @model_validator(mode="after")

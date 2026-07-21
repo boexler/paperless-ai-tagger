@@ -234,10 +234,13 @@ OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 | `OPENROUTER_HTTP_REFERER` | nein | Optionaler Ranking-Header |
 | `OPENROUTER_APP_NAME` | nein | Optionaler `X-Title`-Header |
 | `OPENROUTER_MAX_CONTENT_CHARS` | nein | OCR-Text kürzen (Standard: `1000000`) |
+| `OPENROUTER_RETRY_ATTEMPTS` | nein | Completion-Versuche bei leerer/überlasteter Antwort (Standard: `3`) |
+| `OPENROUTER_RETRY_BACKOFF_SECONDS` | nein | Basis für lineares Backoff in Sekunden (Standard: `5` → 5s, 10s, 15s) |
 
 Hinweise:
 
 - Free-Modelle können Rate Limits und schwächere Qualität haben.
+- Bei ausgeschöpften Retries setzt der Dienst das Tag `ai-error` und eine Notiz am Dokument.
 - Modell sollte zuverlässig strukturiertes JSON liefern ([OpenRouter Models](https://openrouter.ai/models)).
 - Nicht parallel mit Cursor/Codex auf denselben Workflow betreiben.
 

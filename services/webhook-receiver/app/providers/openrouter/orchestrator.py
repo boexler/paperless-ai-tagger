@@ -24,6 +24,7 @@ OPENROUTER_PROMPTS_DIR = Path("/app/prompts/openrouter")
 COMBINED_PROMPT_FILE = "03-tag-document-tax.md"
 
 REQUIRED_PROCESS_TAGS = ("ai-tag-document", "ai-tag-tax")
+AI_ERROR_TAG = "ai-error"
 # Process/review/tax markers may always be created; taxonomy new tags are capped.
 EXEMPT_FROM_NEW_TAG_LIMIT = frozenset(
     name.casefold()
@@ -83,6 +84,40 @@ class OpenRouterOrchestrator:
             result.tags,
             result.tax,
         )
+
+    def mark_processing_failure(self, document_id: int, error: str) -> None:
+        """Merge ai-error tag and append a German failure note; never drop existing tags."""
+        attempts = self.settings.openrouter_retry_attempts
+        backoff = self.settings.openrouter_retry_backoff_seconds
+        note = (
+            "KI-Verarbeitung fehlgeschlagen:\n"
+            f"- Ursache: {error}\n"
+            f"- Retries ausgeschöpft ({attempts} Versuche, lineares Backoff "
+            f"ab {backoff:g}s).\n"
+            f"- Tag {AI_ERROR_TAG} gesetzt. Bitte erneut anstoßen, "
+            "wenn Kapazität wieder frei ist."
+        )
+        try:
+            document = self.paperless.get_document(document_id)
+            existing_tag_ids = _as_int_list(document.get("tags"))
+            tags = self.paperless.list_tags()
+            tags_by_name = {
+                str(tag.get("name") or "").casefold(): int(tag["id"])
+                for tag in tags
+                if "id" in tag and tag.get("name")
+            }
+            error_tag_id = self.paperless.ensure_tag(AI_ERROR_TAG, tags_by_name)
+            merged = sorted(set(existing_tag_ids) | {error_tag_id})
+            self.paperless.update_document(document_id, tags=merged)
+            self.paperless.add_document_note(document_id, note)
+        except PaperlessClientError as exc:
+            logger.error(
+                "Failed to mark document %s with %s after processing error: %s",
+                document_id,
+                AI_ERROR_TAG,
+                exc,
+            )
+            raise
 
     def _load_prompt(self, filename: str) -> str:
         path = self.prompts_dir / filename

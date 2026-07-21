@@ -18,9 +18,15 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
-_EMPTY_RESPONSE_RETRIES = 3
-_EMPTY_RESPONSE_BACKOFF_SECONDS = 5.0
-_RETRYABLE_RESPONSE_MARKERS = ("empty response", "no choices")
+_RETRYABLE_RESPONSE_MARKERS = (
+    "empty response",
+    "no choices",
+    "resourceexhausted",
+    "rate limit",
+    "429",
+    "502",
+    "503",
+)
 
 
 class OpenRouterClientError(Exception):
@@ -38,6 +44,8 @@ class OpenRouterClient:
             headers["X-Title"] = settings.openrouter_app_name
 
         self.model = settings.openrouter_model
+        self.retry_attempts = settings.openrouter_retry_attempts
+        self.retry_backoff_seconds = settings.openrouter_retry_backoff_seconds
         self._client = OpenAI(
             api_key=settings.openrouter_api_key or "",
             base_url=settings.openrouter_base_url,
@@ -48,7 +56,7 @@ class OpenRouterClient:
     def complete_json(self, system_prompt: str, user_prompt: str, schema: type[T]) -> T:
         """Call the model and parse the assistant reply into a Pydantic schema."""
         last_error: Exception | None = None
-        for attempt in range(1, _EMPTY_RESPONSE_RETRIES + 1):
+        for attempt in range(1, self.retry_attempts + 1):
             try:
                 content = self._create_completion(system_prompt, user_prompt)
                 payload = _extract_json_object(content)
@@ -59,17 +67,18 @@ class OpenRouterClient:
                 last_error = exc
                 error_text = str(exc).lower()
                 retryable = any(marker in error_text for marker in _RETRYABLE_RESPONSE_MARKERS)
-                if not retryable or attempt >= _EMPTY_RESPONSE_RETRIES:
+                if not retryable or attempt >= self.retry_attempts:
                     raise
+                delay = attempt * self.retry_backoff_seconds
                 logger.warning(
-                    "OpenRouter retryable empty completion (attempt %s/%s), "
+                    "OpenRouter retryable completion failure (attempt %s/%s), "
                     "retrying in %.1fs: %s",
                     attempt,
-                    _EMPTY_RESPONSE_RETRIES,
-                    _EMPTY_RESPONSE_BACKOFF_SECONDS,
+                    self.retry_attempts,
+                    delay,
                     exc,
                 )
-                time.sleep(_EMPTY_RESPONSE_BACKOFF_SECONDS)
+                time.sleep(delay)
 
         raise OpenRouterClientError(str(last_error) if last_error else "OpenRouter request failed")
 

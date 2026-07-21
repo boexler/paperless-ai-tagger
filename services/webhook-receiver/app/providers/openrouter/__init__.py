@@ -6,6 +6,7 @@ import logging
 import uuid
 
 from app.config import Settings
+from app.paperless_client import PaperlessClientError
 from app.providers.base import TaggingResult
 from app.providers.openrouter.orchestrator import (
     OpenRouterOrchestrator,
@@ -48,6 +49,7 @@ class OpenRouterAgentProvider:
                 run_id,
                 exc,
             )
+            self._mark_failure(orchestrator, document_id, str(exc))
             return TaggingResult(
                 document_id=document_id,
                 status="run_error",
@@ -59,6 +61,7 @@ class OpenRouterAgentProvider:
                 "OpenRouter agent startup/runtime error for document %s",
                 document_id,
             )
+            self._mark_failure(orchestrator, document_id, str(exc))
             return TaggingResult(
                 document_id=document_id,
                 status="startup_error",
@@ -80,3 +83,24 @@ class OpenRouterAgentProvider:
             run_id=run_id,
             summary=summary,
         )
+
+    def _mark_failure(
+        self,
+        orchestrator: OpenRouterOrchestrator,
+        document_id: int,
+        error: str,
+    ) -> None:
+        """Best-effort Paperless ai-error tag + note; never mask the original error."""
+        try:
+            orchestrator.mark_processing_failure(document_id, error)
+        except PaperlessClientError as mark_exc:
+            logger.error(
+                "Could not mark document %s after OpenRouter failure: %s",
+                document_id,
+                mark_exc,
+            )
+        except Exception:
+            logger.exception(
+                "Unexpected error while marking document %s after OpenRouter failure",
+                document_id,
+            )
