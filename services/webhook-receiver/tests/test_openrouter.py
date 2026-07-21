@@ -58,18 +58,21 @@ class OpenRouterSettingsTests(unittest.TestCase):
                 "nvidia/nemotron-3-ultra-550b-a55b:free",
             )
 
-    def test_resolved_openrouter_app_name_uses_git_sha(self) -> None:
+    def test_resolved_openrouter_app_name_defaults(self) -> None:
         with patch.dict(
             os.environ,
             _env(
                 AGENT_PROVIDER="openrouter",
                 OPENROUTER_API_KEY="sk-or-test",
-                GIT_SHA="abc1234",
             ),
             clear=True,
         ):
             settings = Settings(_env_file=None)
-        self.assertEqual(settings.resolved_openrouter_app_name(), "paperless-ai-tagger@abc1234")
+        self.assertEqual(settings.resolved_openrouter_app_name(), "paperless-ai-tagger")
+        self.assertEqual(
+            settings.openrouter_http_referer,
+            "https://github.com/boexler/paperless-ai-tagger",
+        )
 
     def test_resolved_openrouter_app_name_respects_override(self) -> None:
         with patch.dict(
@@ -77,13 +80,14 @@ class OpenRouterSettingsTests(unittest.TestCase):
             _env(
                 AGENT_PROVIDER="openrouter",
                 OPENROUTER_API_KEY="sk-or-test",
-                GIT_SHA="abc1234",
                 OPENROUTER_APP_NAME="custom-app",
+                OPENROUTER_HTTP_REFERER="https://example.com",
             ),
             clear=True,
         ):
             settings = Settings(_env_file=None)
         self.assertEqual(settings.resolved_openrouter_app_name(), "custom-app")
+        self.assertEqual(settings.openrouter_http_referer, "https://example.com")
 
 
 class OpenRouterFactoryTests(unittest.TestCase):

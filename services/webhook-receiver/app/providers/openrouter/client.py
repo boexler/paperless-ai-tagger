@@ -37,12 +37,12 @@ class OpenRouterClient:
     """Thin wrapper around OpenAI SDK pointed at OpenRouter."""
 
     def __init__(self, settings: Settings) -> None:
-        headers: dict[str, str] = {}
-        if settings.openrouter_http_referer:
-            headers["HTTP-Referer"] = settings.openrouter_http_referer
         app_name = settings.resolved_openrouter_app_name()
-        headers["X-Title"] = app_name
-        logger.info("OpenRouter X-Title=%s", app_name)
+        referer = (settings.openrouter_http_referer or "").strip()
+        headers: dict[str, str] = {"X-Title": app_name}
+        if referer:
+            headers["HTTP-Referer"] = referer
+        logger.info("OpenRouter X-Title=%s HTTP-Referer=%s", app_name, referer or "(none)")
 
         self.model = settings.openrouter_model
         self.retry_attempts = settings.openrouter_retry_attempts

@@ -12,6 +12,7 @@ AGENT_PROVIDERS = ("cursor", "codex", "openrouter")
 DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_APP_NAME = "paperless-ai-tagger"
+DEFAULT_OPENROUTER_HTTP_REFERER = "https://github.com/boexler/paperless-ai-tagger"
 CODEX_REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh")
 CODEX_APPROVAL_POLICIES = ("untrusted", "on-request", "on-failure", "never")
 CODEX_SANDBOX_MODES = ("read-only", "workspace-write", "danger-full-access")
@@ -72,15 +73,14 @@ class Settings(BaseSettings):
         default=DEFAULT_OPENROUTER_BASE_URL,
         validation_alias="OPENROUTER_BASE_URL",
     )
-    openrouter_http_referer: str | None = Field(
-        default=None,
+    openrouter_http_referer: str = Field(
+        default=DEFAULT_OPENROUTER_HTTP_REFERER,
         validation_alias="OPENROUTER_HTTP_REFERER",
     )
-    openrouter_app_name: str | None = Field(
-        default=None,
+    openrouter_app_name: str = Field(
+        default=DEFAULT_APP_NAME,
         validation_alias="OPENROUTER_APP_NAME",
     )
-    git_sha: str = Field(default="unknown", validation_alias="GIT_SHA")
     openrouter_max_content_chars: int = Field(
         default=1_000_000,
         validation_alias="OPENROUTER_MAX_CONTENT_CHARS",
@@ -214,11 +214,9 @@ class Settings(BaseSettings):
         return self
 
     def resolved_openrouter_app_name(self) -> str:
-        """Return X-Title for OpenRouter: override or paperless-ai-tagger@<git_sha>."""
-        if self.openrouter_app_name and self.openrouter_app_name.strip():
-            return self.openrouter_app_name.strip()
-        sha = (self.git_sha or "unknown").strip() or "unknown"
-        return f"{DEFAULT_APP_NAME}@{sha}"
+        """Return X-Title for OpenRouter (default: paperless-ai-tagger)."""
+        name = (self.openrouter_app_name or "").strip()
+        return name or DEFAULT_APP_NAME
 
     @model_validator(mode="after")
     def validate_provider_credentials(self) -> Self:

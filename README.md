@@ -70,19 +70,9 @@ Provider-specific keys and models: see subsections under [Agent Providers](#agen
 
 ### 2. Start the stack
 
-The OpenRouter app name in the image includes the short commit (build arg `GIT_SHA`):
-
 ```bash
-GIT_SHA=$(git rev-parse --short HEAD) docker compose up -d --build
+docker compose up -d --build
 ```
-
-Windows (PowerShell):
-
-```powershell
-$env:GIT_SHA = (git rev-parse --short HEAD); docker compose up -d --build
-```
-
-Without `GIT_SHA`, `unknown` is embedded (`paperless-ai-tagger@unknown`).
 
 | Instance | Container | Port | Prompt (Cursor/Codex) |
 |---|---|---|---|
@@ -241,18 +231,17 @@ OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 | `OPENROUTER_API_KEY` | yes | [OpenRouter API Key](https://openrouter.ai/keys) |
 | `OPENROUTER_MODEL` | no | Model slug (default: `nvidia/nemotron-3-ultra-550b-a55b:free`) |
 | `OPENROUTER_BASE_URL` | no | API URL (default: `https://openrouter.ai/api/v1`) |
-| `OPENROUTER_HTTP_REFERER` | no | Optional ranking header |
-| `OPENROUTER_APP_NAME` | no | Optional `X-Title` override (default: `paperless-ai-tagger@<GIT_SHA>`) |
+| `OPENROUTER_HTTP_REFERER` | no | Ranking header (default: `https://github.com/boexler/paperless-ai-tagger`) |
+| `OPENROUTER_APP_NAME` | no | `X-Title` header (default: `paperless-ai-tagger`) |
 | `OPENROUTER_MAX_CONTENT_CHARS` | no | Truncate OCR text (default: `1000000`) |
 | `OPENROUTER_RETRY_ATTEMPTS` | no | Completion retries on empty/overloaded response (default: `3`) |
 | `OPENROUTER_RETRY_BACKOFF_SECONDS` | no | Base for linear backoff in seconds (default: `5` → 5s, 10s, 15s) |
-| `GIT_SHA` | no | Short commit as Docker build arg (default: `unknown`) |
 
 Notes:
 
 - Free models may have rate limits and lower quality.
 - When retries are exhausted, the service sets the `ai-error` tag and a note on the document.
-- OpenRouter shows the app name from the `X-Title` header (default includes build `GIT_SHA`).
+- OpenRouter shows the app via `HTTP-Referer` and `X-Title` (defaults: repo URL + `paperless-ai-tagger`).
 - The model should reliably produce structured JSON ([OpenRouter Models](https://openrouter.ai/models)).
 - Do not run in parallel with Cursor/Codex on the same workflow.
 
