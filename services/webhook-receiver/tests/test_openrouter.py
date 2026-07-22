@@ -397,6 +397,9 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
         note = self.paperless.add_document_note.call_args.args[1]
         self.assertIn("Automatische Einordnung:", note)
         self.assertIn("Steuerprüfung:", note)
+        self.assertIn("KI-Modell:", note)
+        self.assertIn(f"- Modell: {self.settings.openrouter_model}", note)
+        self.assertIn("- temperature: 0.2", note)
         self.assertIn("Dokument 42", summary)
 
     def test_run_uses_confidential_model_and_provider(self) -> None:
@@ -461,6 +464,13 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
                 "only": ["anthropic"],
             },
         )
+        note = self.paperless.add_document_note.call_args.args[1]
+        self.assertIn("KI-Modell:", note)
+        self.assertIn("- Modell: anthropic/claude-sonnet-4.6", note)
+        self.assertIn("- only: anthropic", note)
+        self.assertIn("- allow_fallbacks: false", note)
+        self.assertIn("- data_collection: deny", note)
+        self.assertIn("- zdr: true", note)
 
     def test_run_confidential_without_model_fails_closed(self) -> None:
         """Missing confidential model must not fall back to the default model."""

@@ -74,7 +74,8 @@ class OpenRouterOrchestrator:
         context = self._load_context(document_id)
 
         logger.info("OpenRouter single-shot tagging for document %s", document_id)
-        result = self._run_tagging(context)
+        model, provider = self._resolve_routing(context)
+        result = self._run_tagging(context, model=model, provider=provider)
 
         logger.info("OpenRouter apply for document %s", document_id)
         return self._apply(
@@ -83,6 +84,8 @@ class OpenRouterOrchestrator:
             result.classification,
             result.tags,
             result.tax,
+            model=model,
+            provider=provider,
         )
 
     def mark_processing_failure(self, document_id: int, error: str) -> None:
@@ -163,10 +166,15 @@ class OpenRouterOrchestrator:
             },
         }
 
-    def _run_tagging(self, context: dict[str, Any]) -> DocumentTaggingResult:
+    def _run_tagging(
+        self,
+        context: dict[str, Any],
+        *,
+        model: str,
+        provider: dict[str, Any] | None,
+    ) -> DocumentTaggingResult:
         system = self._load_prompt(COMBINED_PROMPT_FILE)
         user = _build_tagging_user_prompt(context)
-        model, provider = self._resolve_routing(context)
         try:
             return self.llm.complete_json(
                 system,
@@ -223,6 +231,9 @@ class OpenRouterOrchestrator:
         classification: ClassificationResult,
         tags: TagSelectionResult,
         tax: TaxReviewResult,
+        *,
+        model: str,
+        provider: dict[str, Any] | None,
     ) -> str:
         tags_by_name: dict[str, int] = dict(context["tags_by_name"])
         update_fields: dict[str, Any] = {}
@@ -286,6 +297,8 @@ class OpenRouterOrchestrator:
                 note_lines.append("- ai-review-tag-tax wurde gesetzt.")
             else:
                 note_lines.append("- ai-review-tag-tax wurde nicht gesetzt.")
+
+            note_lines.extend(_format_model_attribution_lines(model, provider))
 
             self.paperless.update_document(document_id, **update_fields)
             note_text = "\n".join(note_lines)
@@ -517,6 +530,26 @@ def _tax_result_label(result: str) -> str:
         "maybe": "möglicherweise steuerlich relevant",
         "none": "kein klarer Steuerbezug erkannt",
     }.get(result, result)
+
+
+def _format_model_attribution_lines(
+    model: str,
+    provider: dict[str, Any] | None,
+) -> list[str]:
+    """Append OpenRouter model and routing parameters used for this run."""
+    lines = ["", "KI-Modell:", f"- Modell: {model}", "- temperature: 0.2"]
+    if not provider:
+        return lines
+
+    for key, value in provider.items():
+        if isinstance(value, list):
+            rendered = ", ".join(str(item) for item in value)
+        elif isinstance(value, bool):
+            rendered = "true" if value else "false"
+        else:
+            rendered = str(value)
+        lines.append(f"- {key}: {rendered}")
+    return lines
 
 
 def _as_int_list(value: Any) -> list[int]:
