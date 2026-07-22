@@ -208,7 +208,7 @@ Nutze Ergebnisse aus Phase A (geladene Tags, `document_get`, gesetzte Metadaten)
 
 ### B.1 Ziel
 
-Prüfe Einkommensteuer-Relevanz (beruflich absetzbare Ausgaben: Arbeitsmittel, Fortbildung, Fachliteratur, Reisekosten, Bewerbung, Berufsverband, Homeoffice/Arbeitszimmer, sonstige berufliche Ausgaben).
+Prüfe, ob das Dokument eine **beruflich absetzbare Ausgabe** belegt (Werbungskosten o. Ä.: Arbeitsmittel, Fortbildung, Fachliteratur, Reisekosten, Bewerbung, Berufsverband, Homeoffice/Arbeitszimmer, sonstige berufliche Ausgaben). Ein Einkommensteuerbescheid allein ist keine absetzbare Ausgabe.
 
 Berufliche Kontexte:
 
@@ -221,7 +221,9 @@ Berufliche Kontexte:
 * Nur Steuerrelevanz prüfen — **Titel, Korrespondent, Dokumenttyp nicht ändern** (bereits in Phase A).
 * Bestehende Tags behalten; bei Relevanz `steuerrelevant` ergänzen.
 * **Einziges fachliches Steuer-Tag:** `steuerrelevant`. Keine Untertags (`werbungskosten`, `arbeitsmittel`, `fortbildung`, Berufsfeld-Tags usw.) anlegen oder setzen — alles Absetzbare nur mit `steuerrelevant` markieren.
-* Keine steuerliche Beratung — nur potenzielle Relevanz markieren.
+* **`steuerrelevant` bedeutet nur:** Beleg einer potenziell **absetzbaren Ausgabe** (typisch Werbungskosten / berufliche Aufwendungen). Nicht jedes steuerbezogene Dokument.
+* **Nicht** `steuerrelevant`: Einkommensteuerbescheid, Festsetzung, Steuererklärung, reine Steuerkorrespondenz/Bescheide ohne Ausgabebeleg, Kontoauszüge ohne absetzbare Position.
+* Keine steuerliche Beratung — nur potenzielle Absetzbarkeit markieren.
 * Keine harte Negativentscheidung, wenn spätere Nachschärfung möglich.
 * Kleidung/Textilien nicht automatisch steuerrelevant; im Zweifel `ai-review-tag-tax`.
 * Bei Unsicherheit lieber `ai-review-tag-tax` als falsch positiv/negativ.
@@ -240,7 +242,7 @@ Gegenstände zum Transport/Organisation von Unterrichtsmaterial oder Dienstgerä
 
 #### A — Steuerlich relevant → `steuerrelevant`
 
-Typische Fälle:
+Typische Fälle (Ausgabebelege mit erkennbarem beruflichem Nutzen):
 
 * Rechnung für beruflich genutzte Arbeitsmittel
 * Rechnung für Werkzeug, Messgerät, technisches Zubehör oder Fachausstattung
@@ -253,7 +255,7 @@ Typische Fälle:
 * Beiträge zu Berufsverbänden, Kammern, Gewerkschaften oder beruflichen Netzwerken
 * Kosten für Homeoffice, Arbeitszimmer, Büromaterial oder Büroausstattung
 * Nachweise zu beruflicher Nutzung oder Kostenerstattung
-* Belege zu Steuerberatung, Lohnsteuerhilfe oder Einkommensteuer
+* Rechnung/Honorar für Steuerberatung oder Lohnsteuerhilfe (Ausgabebeleg) — **nicht** der Steuerbescheid selbst
 
 #### B — Möglicherweise relevant → `ai-review-tag-tax`
 
@@ -266,7 +268,7 @@ Typische Fälle:
 * Fortbildungsbezug möglich, Kursinhalt unklar
 * Homeoffice-/Arbeitszimmerbezug möglich, privat mitveranlasst
 * Gemischte private und berufliche Positionen
-* Rechtliche/steuerliche/finanzielle Themen, konkreter Bezug unklar
+* Rechtliche/finanzielle Themen, konkreter Absetzungsbezug unklar
 * Betrag oder Artikel nicht lesbar; Dokumenttyp passt nicht zum Inhalt
 * Kleidung/Schuhe/Textilien möglicherweise beruflich, steuerlich nicht eindeutig
 * Transportmittel für Unterrichtsmaterial — beruflicher Zweck plausibel, Beleg unklar
@@ -278,7 +280,7 @@ Typische Fälle:
 * kein `steuerrelevant`
 * `ai-review-tag-tax`, wenn später menschlich nachgeschärft werden soll
 
-Eher privat: Konsum, Lebensmittel, Freizeit, private Kleidung, Haushalt ohne Arbeitszimmer-Bezug, private Unterhaltungselektronik.
+Eher privat / nicht absetzbar hier: Konsum, Lebensmittel, Freizeit, private Kleidung, Haushalt ohne Arbeitszimmer-Bezug, private Unterhaltungselektronik; außerdem **Einkommensteuerbescheid**, Festsetzung, Steuererklärung und reine Steuerkorrespondenz ohne Ausgabebeleg.
 
 ### B.5 Berufsfeldbezug
 
@@ -301,7 +303,7 @@ Potenziell steuerlich relevante Hinweise:
 
 * **Hardware:** Laptop, Computer, PC-Komponenten, Monitor, Tastatur, Maus, Trackball, Grafiktablet, Headset, Mikrofon, Webcam, Dockingstation, USB-Hub, Router, Switch, NAS, Server, SSD, RAM, Drucker, Scanner
 * **Dienste/Lizenzen:** Cloud-Dienste, Hosting, Domains, SSL, E-Mail-Hosting, VPN, Softwarelizenzen, IDE, Git/CI/CD, SaaS, PM-/Dokumentations-/Design-/API-/DB-/Test-/Security-Tools
-* **Weiterbildung/Büro:** Fachliteratur, Online-Kurse, Zertifizierungen, Konferenzen, Schreibtisch, Bürostuhl, Monitorarm, Arbeitsplatzbeleuchtung, Homeoffice-Ausstattung, Steuerberatung bei selbständiger/nebenberuflicher IT-Tätigkeit, EDV-Projektrechnungen
+* **Weiterbildung/Büro:** Fachliteratur, Online-Kurse, Zertifizierungen, Konferenzen, Schreibtisch, Bürostuhl, Monitorarm, Arbeitsplatzbeleuchtung, Homeoffice-Ausstattung, Honorar-Rechnung Steuerberatung bei selbständiger/nebenberuflicher IT-Tätigkeit (nicht der Steuerbescheid), EDV-Projektrechnungen
 
 Bei Relevanz nur `steuerrelevant` (+ Prozess-Tags) — keine Berufsfeld-/Kostenarten-Tags in Phase B.
 
@@ -327,15 +329,16 @@ Bei Relevanz nur `steuerrelevant` (+ Prozess-Tags) — keine Berufsfeld-/Kostena
 
 ### B.6 Entscheidungslogik
 
-1. Klarer Berufs-/Steuerbezug → `steuerrelevant`.
+1. Klar absetzbare berufliche Ausgabe (Werbungskosten o. Ä.) → `steuerrelevant`.
 2. Möglich, aber unsicher → `ai-review-tag-tax`; `steuerrelevant` nur wenn überwiegend plausibel.
-3. Kein klarer Bezug → `ai-tag-tax`, kein `steuerrelevant`; ggf. `ai-review-tag-tax` für Nachschärfung.
+3. Kein klarer Absetzungsbezug → `ai-tag-tax`, kein `steuerrelevant`; ggf. `ai-review-tag-tax` für Nachschärfung.
 4. **Immer** `ai-tag-tax` setzen.
 5. Keine Steuer-Untertags; Berufskontext nur in der Notiz / `professional_context`.
 6. Gemischte Nutzung → `steuerrelevant` wenn plausibel + `ai-review-tag-tax` für Aufteilung.
 7. Kleidung/Textilien → nicht automatisch `steuerrelevant`; Schutzbezug nur vorsichtig + Review.
 8. Transportmittel (Tasche, Rucksack, Koffer, Organizer …)? → Regel „Transport (Lehrkraft)“; plausibel `steuerrelevant`, sonst mindestens `ai-review-tag-tax`.
-9. Fristen/Mahnungen nur steuerlich relevant, wenn Steuerbezug möglich.
+9. Einkommensteuerbescheid / Festsetzung / Steuererklärung / reine Steuerkorrespondenz → `none`, **kein** `steuerrelevant` (auch wenn „Steuer“ im Titel steht).
+10. Fristen/Mahnungen nur `steuerrelevant`, wenn sie einen absetzbaren Ausgabebeleg betreffen.
 
 ---
 

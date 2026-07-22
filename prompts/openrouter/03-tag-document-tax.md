@@ -78,19 +78,22 @@ Berufliche Kontexte: Mechatroniker/Industrie, Software/EDV, Grundschullehrerin/P
 
 Einziges fachliches Steuer-Tag: `steuerrelevant`. Keine Untertags (kein `werbungskosten`, `arbeitsmittel`, `fortbildung`, …) anlegen oder setzen — alles Absetzbare nur mit `steuerrelevant` markieren.
 
+**Bedeutung von `steuerrelevant`:** nur Belege einer potenziell **absetzbaren Ausgabe** (typisch Werbungskosten / berufliche Aufwendungen). Nicht jedes Dokument mit Steuerbezug.
+
 * Immer `ai-tag-tax` setzen.
-* `steuerrelevant` bei klarem Berufs-/Steuerbezug (Arbeitsmittel, Fortbildung, Fachliteratur, Reise-/Fahrtkosten, Bewerbung, Berufsverband, Homeoffice/Arbeitszimmer, sonstige berufliche Ausgaben).
+* `steuerrelevant` bei klar absetzbarer beruflicher Ausgabe (Arbeitsmittel, Fortbildung, Fachliteratur, Reise-/Fahrtkosten, Bewerbung, Berufsverband, Homeoffice/Arbeitszimmer, sonstige berufliche Ausgaben; ggf. Honorar-Rechnung Steuerberatung/Lohnsteuerhilfe).
+* **Nicht** `steuerrelevant`: Einkommensteuerbescheid, Festsetzung, Steuererklärung, reine Steuerkorrespondenz/Bescheide ohne Ausgabebeleg — auch wenn „Einkommensteuer“/„Finanzamt“ im Titel steht → `result=none`.
 * Bei Unsicherheit: `ai-review-tag-tax` (lieber Review als falsch positiv/negativ).
 * Kleidung/Textilien nicht automatisch steuerrelevant.
 * Transportmittel für Unterrichtsmaterial (Tasche, Rucksack, Koffer, Organizer, auch mit Notebookfach) können absetzbar sein — Mode-Optik schließt Berufsbezug nicht aus; bei Plausibilität `steuerrelevant`.
-* Keine steuerliche Beratung — nur potenzielle Relevanz markieren.
+* Keine steuerliche Beratung — nur potenzielle Absetzbarkeit markieren.
 * In `tax.tags_to_add` / `tax.new_tags` nur `steuerrelevant`, `ai-tag-tax`, `ai-review-tag-tax` (je nach Ergebnis) — keine weiteren Steuer-Untertags.
 
 Entscheidung:
 
-* `relevant` → `steuerrelevant` + `ai-tag-tax`
+* `relevant` → `steuerrelevant` + `ai-tag-tax` (nur bei absetzbarer Ausgabe)
 * `maybe` → `ai-review-tag-tax` + `ai-tag-tax` (`steuerrelevant` nur wenn überwiegend plausibel)
-* `none` → nur `ai-tag-tax` (optional Review zur Nachschärfung)
+* `none` → nur `ai-tag-tax` (optional Review zur Nachschärfung; Standard für Steuerbescheide ohne Ausgabebeleg)
 
 ## Antwort-Schema
 
