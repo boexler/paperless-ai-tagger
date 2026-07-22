@@ -35,6 +35,9 @@ def format_provider_model(settings: Settings) -> str:
             f"provider=openrouter model={settings.openrouter_model}",
             f"base_url={settings.openrouter_base_url}",
         ]
+        default_providers = settings.parsed_providers()
+        if default_providers:
+            parts.append(f"providers={','.join(default_providers)}")
         if settings.openrouter_confidential_model:
             parts.append(
                 f"confidential_model={settings.openrouter_confidential_model}",

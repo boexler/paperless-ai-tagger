@@ -95,6 +95,22 @@ class Settings(BaseSettings):
         default=5.0,
         validation_alias="OPENROUTER_RETRY_BACKOFF_SECONDS",
     )
+    openrouter_providers: str = Field(
+        default="",
+        validation_alias="OPENROUTER_PROVIDERS",
+    )
+    openrouter_allow_fallbacks: bool = Field(
+        default=True,
+        validation_alias="OPENROUTER_ALLOW_FALLBACKS",
+    )
+    openrouter_data_collection: Literal["allow", "deny"] = Field(
+        default="allow",
+        validation_alias="OPENROUTER_DATA_COLLECTION",
+    )
+    openrouter_zdr: bool = Field(
+        default=False,
+        validation_alias="OPENROUTER_ZDR",
+    )
     openrouter_confidential_model: str | None = Field(
         default=None,
         validation_alias="OPENROUTER_CONFIDENTIAL_MODEL",
@@ -248,16 +264,15 @@ class Settings(BaseSettings):
             )
         return ",".join(tags)
 
-    @field_validator("openrouter_confidential_data_collection")
+    @field_validator("openrouter_data_collection", "openrouter_confidential_data_collection")
     @classmethod
-    def validate_openrouter_confidential_data_collection(cls, value: str) -> str:
+    def validate_openrouter_data_collection(cls, value: str) -> str:
         """Reject unsupported OpenRouter data_collection modes."""
         normalized = value.strip().lower()
         if normalized not in OPENROUTER_DATA_COLLECTION_MODES:
             allowed = ", ".join(OPENROUTER_DATA_COLLECTION_MODES)
             raise ValueError(
-                "Invalid OPENROUTER_CONFIDENTIAL_DATA_COLLECTION "
-                f"{value!r}: expected one of {allowed}",
+                f"Invalid OpenRouter data_collection {value!r}: expected one of {allowed}",
             )
         return normalized
 
@@ -285,6 +300,14 @@ class Settings(BaseSettings):
             if part.strip()
         )
 
+    def parsed_providers(self) -> list[str]:
+        """Return ordered OpenRouter provider slugs for default routing."""
+        return [
+            part.strip()
+            for part in self.openrouter_providers.split(",")
+            if part.strip()
+        ]
+
     def parsed_confidential_providers(self) -> list[str]:
         """Return ordered OpenRouter provider slugs for confidential routing."""
         return [
@@ -292,6 +315,18 @@ class Settings(BaseSettings):
             for part in self.openrouter_confidential_providers.split(",")
             if part.strip()
         ]
+
+    def default_provider_preferences(self) -> dict[str, Any]:
+        """Build the OpenRouter provider object for default completions."""
+        preferences: dict[str, Any] = {
+            "allow_fallbacks": self.openrouter_allow_fallbacks,
+            "data_collection": self.openrouter_data_collection,
+            "zdr": self.openrouter_zdr,
+        }
+        providers = self.parsed_providers()
+        if providers:
+            preferences["only"] = providers
+        return preferences
 
     def confidential_provider_preferences(self) -> dict[str, Any]:
         """Build the OpenRouter provider object for confidential completions."""

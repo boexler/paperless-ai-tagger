@@ -200,7 +200,13 @@ class OpenRouterOrchestrator:
             self.settings.parsed_confidential_tags(),
         )
         if not matched_tags:
-            return self.settings.openrouter_model, None
+            provider = self.settings.default_provider_preferences()
+            logger.info(
+                "OpenRouter default routing model=%s provider=%s",
+                self.settings.openrouter_model,
+                provider,
+            )
+            return self.settings.openrouter_model, provider
 
         confidential_model = self.settings.openrouter_confidential_model
         if not confidential_model:

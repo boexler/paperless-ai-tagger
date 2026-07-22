@@ -113,6 +113,43 @@ class OpenRouterSettingsTests(unittest.TestCase):
                 "zdr": True,
             },
         )
+        self.assertEqual(settings.parsed_providers(), [])
+        self.assertTrue(settings.openrouter_allow_fallbacks)
+        self.assertEqual(settings.openrouter_data_collection, "allow")
+        self.assertFalse(settings.openrouter_zdr)
+        self.assertEqual(
+            settings.default_provider_preferences(),
+            {
+                "allow_fallbacks": True,
+                "data_collection": "allow",
+                "zdr": False,
+            },
+        )
+
+    def test_default_provider_preferences_include_only(self) -> None:
+        with patch.dict(
+            os.environ,
+            _env(
+                AGENT_PROVIDER="openrouter",
+                OPENROUTER_API_KEY="sk-or-test",
+                OPENROUTER_PROVIDERS="nvidia, together",
+                OPENROUTER_ALLOW_FALLBACKS="false",
+                OPENROUTER_DATA_COLLECTION="deny",
+                OPENROUTER_ZDR="true",
+            ),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+        self.assertEqual(settings.parsed_providers(), ["nvidia", "together"])
+        self.assertEqual(
+            settings.default_provider_preferences(),
+            {
+                "allow_fallbacks": False,
+                "data_collection": "deny",
+                "zdr": True,
+                "only": ["nvidia", "together"],
+            },
+        )
 
     def test_confidential_provider_preferences_include_only(self) -> None:
         with patch.dict(
@@ -386,7 +423,14 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
         self.llm.complete_json.assert_called_once()
         call_kwargs = self.llm.complete_json.call_args.kwargs
         self.assertEqual(call_kwargs["model"], self.settings.openrouter_model)
-        self.assertIsNone(call_kwargs["provider"])
+        self.assertEqual(
+            call_kwargs["provider"],
+            {
+                "allow_fallbacks": True,
+                "data_collection": "allow",
+                "zdr": False,
+            },
+        )
         schema = self.llm.complete_json.call_args.args[2]
         self.assertIs(schema, DocumentTaggingResult)
         self.paperless.update_document.assert_called_once()
