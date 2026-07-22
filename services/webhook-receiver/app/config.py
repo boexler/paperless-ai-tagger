@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,6 +13,8 @@ DEFAULT_OPENROUTER_MODEL = "nvidia/nemotron-3-ultra-550b-a55b:free"
 DEFAULT_OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 DEFAULT_APP_NAME = "paperless-ai-tagger"
 DEFAULT_OPENROUTER_HTTP_REFERER = "https://github.com/boexler/paperless-ai-tagger"
+DEFAULT_OPENROUTER_CONFIDENTIAL_TAGS = "vertraulich,confidential"
+OPENROUTER_DATA_COLLECTION_MODES = ("allow", "deny")
 CODEX_REASONING_EFFORTS = ("none", "minimal", "low", "medium", "high", "xhigh")
 CODEX_APPROVAL_POLICIES = ("untrusted", "on-request", "on-failure", "never")
 CODEX_SANDBOX_MODES = ("read-only", "workspace-write", "danger-full-access")
@@ -92,6 +94,30 @@ class Settings(BaseSettings):
     openrouter_retry_backoff_seconds: float = Field(
         default=5.0,
         validation_alias="OPENROUTER_RETRY_BACKOFF_SECONDS",
+    )
+    openrouter_confidential_model: str | None = Field(
+        default=None,
+        validation_alias="OPENROUTER_CONFIDENTIAL_MODEL",
+    )
+    openrouter_confidential_tags: str = Field(
+        default=DEFAULT_OPENROUTER_CONFIDENTIAL_TAGS,
+        validation_alias="OPENROUTER_CONFIDENTIAL_TAGS",
+    )
+    openrouter_confidential_providers: str = Field(
+        default="",
+        validation_alias="OPENROUTER_CONFIDENTIAL_PROVIDERS",
+    )
+    openrouter_confidential_allow_fallbacks: bool = Field(
+        default=False,
+        validation_alias="OPENROUTER_CONFIDENTIAL_ALLOW_FALLBACKS",
+    )
+    openrouter_confidential_data_collection: Literal["allow", "deny"] = Field(
+        default="deny",
+        validation_alias="OPENROUTER_CONFIDENTIAL_DATA_COLLECTION",
+    )
+    openrouter_confidential_zdr: bool = Field(
+        default=True,
+        validation_alias="OPENROUTER_CONFIDENTIAL_ZDR",
     )
     paperless_url: str = Field(
         validation_alias=AliasChoices("PAPERLESS_URL", "PAPERLESS_BASE_URL"),
@@ -202,6 +228,39 @@ class Settings(BaseSettings):
             raise ValueError("OPENROUTER_RETRY_BACKOFF_SECONDS must be >= 0")
         return value
 
+    @field_validator("openrouter_confidential_model")
+    @classmethod
+    def validate_openrouter_confidential_model(cls, value: str | None) -> str | None:
+        """Normalize empty confidential model overrides to unset."""
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None
+
+    @field_validator("openrouter_confidential_tags")
+    @classmethod
+    def validate_openrouter_confidential_tags(cls, value: str) -> str:
+        """Require at least one confidential trigger tag name."""
+        tags = [part.strip() for part in value.split(",") if part.strip()]
+        if not tags:
+            raise ValueError(
+                "OPENROUTER_CONFIDENTIAL_TAGS must list at least one tag name",
+            )
+        return ",".join(tags)
+
+    @field_validator("openrouter_confidential_data_collection")
+    @classmethod
+    def validate_openrouter_confidential_data_collection(cls, value: str) -> str:
+        """Reject unsupported OpenRouter data_collection modes."""
+        normalized = value.strip().lower()
+        if normalized not in OPENROUTER_DATA_COLLECTION_MODES:
+            allowed = ", ".join(OPENROUTER_DATA_COLLECTION_MODES)
+            raise ValueError(
+                "Invalid OPENROUTER_CONFIDENTIAL_DATA_COLLECTION "
+                f"{value!r}: expected one of {allowed}",
+            )
+        return normalized
+
     @model_validator(mode="after")
     def resolve_prompt_template_path(self) -> Self:
         """Resolve prompt path from PROMPT_TEMPLATE when PROMPT_TEMPLATE_PATH is unset."""
@@ -217,6 +276,34 @@ class Settings(BaseSettings):
         """Return X-Title for OpenRouter (default: paperless-ai-tagger)."""
         name = (self.openrouter_app_name or "").strip()
         return name or DEFAULT_APP_NAME
+
+    def parsed_confidential_tags(self) -> frozenset[str]:
+        """Return casefolded confidential trigger tag names from settings."""
+        return frozenset(
+            part.strip().casefold()
+            for part in self.openrouter_confidential_tags.split(",")
+            if part.strip()
+        )
+
+    def parsed_confidential_providers(self) -> list[str]:
+        """Return ordered OpenRouter provider slugs for confidential routing."""
+        return [
+            part.strip()
+            for part in self.openrouter_confidential_providers.split(",")
+            if part.strip()
+        ]
+
+    def confidential_provider_preferences(self) -> dict[str, Any]:
+        """Build the OpenRouter provider object for confidential completions."""
+        preferences: dict[str, Any] = {
+            "allow_fallbacks": self.openrouter_confidential_allow_fallbacks,
+            "data_collection": self.openrouter_confidential_data_collection,
+            "zdr": self.openrouter_confidential_zdr,
+        }
+        providers = self.parsed_confidential_providers()
+        if providers:
+            preferences["only"] = providers
+        return preferences
 
     @model_validator(mode="after")
     def validate_provider_credentials(self) -> Self:

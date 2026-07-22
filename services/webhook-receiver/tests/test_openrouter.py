@@ -89,6 +89,75 @@ class OpenRouterSettingsTests(unittest.TestCase):
         self.assertEqual(settings.resolved_openrouter_app_name(), "custom-app")
         self.assertEqual(settings.openrouter_http_referer, "https://example.com")
 
+    def test_confidential_settings_defaults(self) -> None:
+        with patch.dict(
+            os.environ,
+            _env(AGENT_PROVIDER="openrouter", OPENROUTER_API_KEY="sk-or-test"),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+        self.assertIsNone(settings.openrouter_confidential_model)
+        self.assertEqual(
+            settings.parsed_confidential_tags(),
+            frozenset({"vertraulich", "confidential"}),
+        )
+        self.assertEqual(settings.parsed_confidential_providers(), [])
+        self.assertFalse(settings.openrouter_confidential_allow_fallbacks)
+        self.assertEqual(settings.openrouter_confidential_data_collection, "deny")
+        self.assertTrue(settings.openrouter_confidential_zdr)
+        self.assertEqual(
+            settings.confidential_provider_preferences(),
+            {
+                "allow_fallbacks": False,
+                "data_collection": "deny",
+                "zdr": True,
+            },
+        )
+
+    def test_confidential_provider_preferences_include_only(self) -> None:
+        with patch.dict(
+            os.environ,
+            _env(
+                AGENT_PROVIDER="openrouter",
+                OPENROUTER_API_KEY="sk-or-test",
+                OPENROUTER_CONFIDENTIAL_MODEL="anthropic/claude-sonnet-4.6",
+                OPENROUTER_CONFIDENTIAL_PROVIDERS="anthropic, amazon-bedrock",
+                OPENROUTER_CONFIDENTIAL_ALLOW_FALLBACKS="false",
+            ),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+        self.assertEqual(
+            settings.openrouter_confidential_model,
+            "anthropic/claude-sonnet-4.6",
+        )
+        self.assertEqual(
+            settings.parsed_confidential_providers(),
+            ["anthropic", "amazon-bedrock"],
+        )
+        self.assertEqual(
+            settings.confidential_provider_preferences(),
+            {
+                "allow_fallbacks": False,
+                "data_collection": "deny",
+                "zdr": True,
+                "only": ["anthropic", "amazon-bedrock"],
+            },
+        )
+
+    def test_confidential_tags_reject_empty(self) -> None:
+        with patch.dict(
+            os.environ,
+            _env(
+                AGENT_PROVIDER="openrouter",
+                OPENROUTER_API_KEY="sk-or-test",
+                OPENROUTER_CONFIDENTIAL_TAGS=" , ",
+            ),
+            clear=True,
+        ):
+            with self.assertRaises(ValidationError):
+                Settings(_env_file=None)
+
 
 class OpenRouterFactoryTests(unittest.TestCase):
     """Validate OpenRouter provider factory wiring."""
@@ -117,6 +186,22 @@ class OpenRouterFactoryTests(unittest.TestCase):
             formatted = format_provider_model(settings)
         self.assertIn("provider=openrouter", formatted)
         self.assertIn("openai/gpt-4o-mini", formatted)
+
+    def test_format_provider_model_includes_confidential(self) -> None:
+        with patch.dict(
+            os.environ,
+            _env(
+                AGENT_PROVIDER="openrouter",
+                OPENROUTER_API_KEY="sk-or-test",
+                OPENROUTER_CONFIDENTIAL_MODEL="anthropic/claude-sonnet-4.6",
+                OPENROUTER_CONFIDENTIAL_PROVIDERS="anthropic",
+            ),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+            formatted = format_provider_model(settings)
+        self.assertIn("confidential_model=anthropic/claude-sonnet-4.6", formatted)
+        self.assertIn("confidential_providers=anthropic", formatted)
 
 
 class OpenRouterJsonParsingTests(unittest.TestCase):
@@ -173,6 +258,54 @@ class OpenRouterClientRetryTests(unittest.TestCase):
         self.assertEqual(sleep_mock.call_args_list[0].args[0], 5.0)
         self.assertEqual(sleep_mock.call_args_list[1].args[0], 10.0)
         self.assertTrue(any("no choices" in line for line in logs.output))
+
+    def test_passes_model_and_provider_via_extra_body(self) -> None:
+        from app.providers.openrouter.client import OpenRouterClient
+        from app.providers.openrouter.schemas import TaxReviewResult
+
+        with patch.dict(
+            os.environ,
+            _env(AGENT_PROVIDER="openrouter", OPENROUTER_API_KEY="sk-or-test"),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+
+        client = OpenRouterClient(settings)
+        ok = MagicMock()
+        ok.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content='{"result":"none","tags_to_add":["ai-tag-tax"],'
+                    '"new_tags":[],"needs_review":false,'
+                    '"professional_context":"keine","tax_note":"ok"}',
+                    refusal=None,
+                ),
+                finish_reason="stop",
+            ),
+        ]
+        provider = {
+            "only": ["anthropic"],
+            "allow_fallbacks": False,
+            "data_collection": "deny",
+            "zdr": True,
+        }
+
+        with patch.object(
+            client._client.chat.completions,
+            "create",
+            return_value=ok,
+        ) as create_mock:
+            client.complete_json(
+                "system",
+                "user",
+                TaxReviewResult,
+                model="anthropic/claude-sonnet-4.6",
+                provider=provider,
+            )
+
+        kwargs = create_mock.call_args.kwargs
+        self.assertEqual(kwargs["model"], "anthropic/claude-sonnet-4.6")
+        self.assertEqual(kwargs["extra_body"], {"provider": provider})
 
 
 class OpenRouterOrchestratorTests(unittest.TestCase):
@@ -251,6 +384,9 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
         summary = self.orchestrator.run(42)
 
         self.llm.complete_json.assert_called_once()
+        call_kwargs = self.llm.complete_json.call_args.kwargs
+        self.assertEqual(call_kwargs["model"], self.settings.openrouter_model)
+        self.assertIsNone(call_kwargs["provider"])
         schema = self.llm.complete_json.call_args.args[2]
         self.assertIs(schema, DocumentTaggingResult)
         self.paperless.update_document.assert_called_once()
@@ -262,6 +398,88 @@ class OpenRouterOrchestratorTests(unittest.TestCase):
         self.assertIn("Automatische Einordnung:", note)
         self.assertIn("Steuerprüfung:", note)
         self.assertIn("Dokument 42", summary)
+
+    def test_run_uses_confidential_model_and_provider(self) -> None:
+        """Documents with confidential tags must use confidential routing."""
+        with patch.dict(
+            os.environ,
+            _env(
+                AGENT_PROVIDER="openrouter",
+                OPENROUTER_API_KEY="sk-or-test",
+                OPENROUTER_CONFIDENTIAL_MODEL="anthropic/claude-sonnet-4.6",
+                OPENROUTER_CONFIDENTIAL_PROVIDERS="anthropic",
+            ),
+            clear=True,
+        ):
+            settings = Settings(_env_file=None)
+
+        orchestrator = OpenRouterOrchestrator(
+            settings,
+            paperless=self.paperless,
+            llm=self.llm,
+            prompts_dir=self.prompts_dir,
+        )
+        self.paperless.get_document.return_value = {
+            "id": 99,
+            "title": "Vertrag",
+            "correspondent": None,
+            "document_type": None,
+            "tags": [30],
+            "content": "vertraulicher Vertrag",
+        }
+        self.paperless.list_tags.return_value = [
+            {"id": 20, "name": "ai-tag-document"},
+            {"id": 21, "name": "ai-tag-tax"},
+            {"id": 30, "name": "Vertraulich"},
+        ]
+        self.paperless.list_correspondents.return_value = []
+        self.paperless.list_document_types.return_value = []
+        self.paperless.ensure_tag.side_effect = lambda name, tags_by_name: {
+            "ai-tag-document": 20,
+            "ai-tag-tax": 21,
+        }[name]
+        self.llm.complete_json.return_value = DocumentTaggingResult(
+            classification=ClassificationResult(
+                correspondent=CorrespondentDecision(action="keep"),
+                document_type=DocumentTypeDecision(action="keep"),
+                title=TitleDecision(action="keep"),
+            ),
+            tags=TagSelectionResult(tags_to_add=["ai-tag-document"]),
+            tax=TaxReviewResult(result="none", tags_to_add=["ai-tag-tax"]),
+        )
+
+        orchestrator.run(99)
+
+        call_kwargs = self.llm.complete_json.call_args.kwargs
+        self.assertEqual(call_kwargs["model"], "anthropic/claude-sonnet-4.6")
+        self.assertEqual(
+            call_kwargs["provider"],
+            {
+                "allow_fallbacks": False,
+                "data_collection": "deny",
+                "zdr": True,
+                "only": ["anthropic"],
+            },
+        )
+
+    def test_run_confidential_without_model_fails_closed(self) -> None:
+        """Missing confidential model must not fall back to the default model."""
+        self.paperless.get_document.return_value = {
+            "id": 5,
+            "title": "X",
+            "tags": [30],
+            "content": "secret",
+        }
+        self.paperless.list_tags.return_value = [
+            {"id": 30, "name": "confidential"},
+        ]
+        self.paperless.list_correspondents.return_value = []
+        self.paperless.list_document_types.return_value = []
+
+        with self.assertRaises(Exception) as ctx:
+            self.orchestrator.run(5)
+        self.assertIn("OPENROUTER_CONFIDENTIAL_MODEL", str(ctx.exception))
+        self.llm.complete_json.assert_not_called()
 
     def test_run_sets_created_date_when_valid_iso(self) -> None:
         """Valid created.set patches document.created and notes the change."""

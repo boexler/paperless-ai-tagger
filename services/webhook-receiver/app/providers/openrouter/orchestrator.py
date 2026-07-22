@@ -166,10 +166,55 @@ class OpenRouterOrchestrator:
     def _run_tagging(self, context: dict[str, Any]) -> DocumentTaggingResult:
         system = self._load_prompt(COMBINED_PROMPT_FILE)
         user = _build_tagging_user_prompt(context)
+        model, provider = self._resolve_routing(context)
         try:
-            return self.llm.complete_json(system, user, DocumentTaggingResult)
+            return self.llm.complete_json(
+                system,
+                user,
+                DocumentTaggingResult,
+                model=model,
+                provider=provider,
+            )
         except OpenRouterClientError as exc:
             raise OpenRouterOrchestratorError(f"Tagging request failed: {exc}") from exc
+
+    def _resolve_routing(
+        self,
+        context: dict[str, Any],
+    ) -> tuple[str, dict[str, Any] | None]:
+        """Pick default or confidential OpenRouter model/provider for this document."""
+        matched_tags = _matched_confidential_tags(
+            context,
+            self.settings.parsed_confidential_tags(),
+        )
+        if not matched_tags:
+            return self.settings.openrouter_model, None
+
+        confidential_model = self.settings.openrouter_confidential_model
+        if not confidential_model:
+            raise OpenRouterOrchestratorError(
+                "Document has confidential tag(s) "
+                f"{sorted(matched_tags)} but OPENROUTER_CONFIDENTIAL_MODEL is not set",
+            )
+
+        provider = self.settings.confidential_provider_preferences()
+        if not self.settings.parsed_confidential_providers():
+            logger.warning(
+                "Confidential document tags=%s without OPENROUTER_CONFIDENTIAL_PROVIDERS; "
+                "data residency is not pinned (zdr=%s data_collection=%s allow_fallbacks=%s)",
+                sorted(matched_tags),
+                provider.get("zdr"),
+                provider.get("data_collection"),
+                provider.get("allow_fallbacks"),
+            )
+        else:
+            logger.info(
+                "OpenRouter confidential routing model=%s tags=%s provider=%s",
+                confidential_model,
+                sorted(matched_tags),
+                provider,
+            )
+        return confidential_model, provider
 
     def _apply(
         self,
@@ -484,6 +529,21 @@ def _as_int_list(value: Any) -> list[int]:
         except (TypeError, ValueError):
             continue
     return result
+
+
+def _matched_confidential_tags(
+    context: dict[str, Any],
+    confidential_tags: frozenset[str],
+) -> frozenset[str]:
+    """Return confidential tag names present on the document (casefolded)."""
+    if not confidential_tags:
+        return frozenset()
+    tags_by_id: dict[int, str] = context.get("tags_by_id") or {}
+    existing_names = {
+        str(tags_by_id.get(tag_id) or "").casefold()
+        for tag_id in context.get("existing_tag_ids") or []
+    }
+    return frozenset(name for name in existing_names if name and name in confidential_tags)
 
 
 def _compact_catalog(items: list[dict[str, Any]], fields: tuple[str, ...]) -> list[dict[str, Any]]:

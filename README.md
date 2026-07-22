@@ -236,6 +236,12 @@ OPENROUTER_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
 | `OPENROUTER_MAX_CONTENT_CHARS` | no | Truncate OCR text (default: `1000000`) |
 | `OPENROUTER_RETRY_ATTEMPTS` | no | Completion retries on empty/overloaded response (default: `3`) |
 | `OPENROUTER_RETRY_BACKOFF_SECONDS` | no | Base for linear backoff in seconds (default: `5` → 5s, 10s, 15s) |
+| `OPENROUTER_CONFIDENTIAL_MODEL` | no* | Alternate model for confidential documents (*required when such a tag is present) |
+| `OPENROUTER_CONFIDENTIAL_TAGS` | no | Comma-separated trigger tags (default: `vertraulich,confidential`) |
+| `OPENROUTER_CONFIDENTIAL_PROVIDERS` | no | Comma-separated OpenRouter provider slugs (`only`); prefer region-specific slugs |
+| `OPENROUTER_CONFIDENTIAL_ALLOW_FALLBACKS` | no | Allow other providers if primary unavailable (default: `false`) |
+| `OPENROUTER_CONFIDENTIAL_DATA_COLLECTION` | no | `deny` or `allow` (default: `deny`) |
+| `OPENROUTER_CONFIDENTIAL_ZDR` | no | Require Zero Data Retention endpoints (default: `true`) |
 
 Notes:
 
@@ -244,6 +250,7 @@ Notes:
 - OpenRouter shows the app via `HTTP-Referer` and `X-Title` (defaults: repo URL + `paperless-ai-tagger`).
 - The model should reliably produce structured JSON ([OpenRouter Models](https://openrouter.ai/models)).
 - Do not run in parallel with Cursor/Codex on the same workflow.
+- Documents tagged `vertraulich` / `confidential` (configurable) use `OPENROUTER_CONFIDENTIAL_MODEL` with OpenRouter [provider routing](https://openrouter.ai/docs/guides/routing/provider-selection) (`only`, `allow_fallbacks`, `data_collection`, `zdr`). Without a confidential model configured, processing fails closed instead of falling back to the default model. Copy exact provider slugs from the model page when pinning data residency (e.g. `google-vertex/europe-west4`).
 
 ### Local development (without Docker)
 

@@ -54,12 +54,25 @@ class OpenRouterClient:
             timeout=120.0,
         )
 
-    def complete_json(self, system_prompt: str, user_prompt: str, schema: type[T]) -> T:
+    def complete_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        schema: type[T],
+        *,
+        model: str | None = None,
+        provider: dict[str, Any] | None = None,
+    ) -> T:
         """Call the model and parse the assistant reply into a Pydantic schema."""
         last_error: Exception | None = None
         for attempt in range(1, self.retry_attempts + 1):
             try:
-                content = self._create_completion(system_prompt, user_prompt)
+                content = self._create_completion(
+                    system_prompt,
+                    user_prompt,
+                    model=model,
+                    provider=provider,
+                )
                 payload = _extract_json_object(content)
                 return schema.model_validate(payload)
             except ValidationError as exc:
@@ -83,28 +96,47 @@ class OpenRouterClient:
 
         raise OpenRouterClientError(str(last_error) if last_error else "OpenRouter request failed")
 
-    def _create_completion(self, system_prompt: str, user_prompt: str) -> str:
+    def _create_completion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        model: str | None = None,
+        provider: dict[str, Any] | None = None,
+    ) -> str:
         """Send one chat completion and return non-empty assistant text."""
-        try:
-            response = self._client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                temperature=0.2,
+        resolved_model = (model or self.model).strip() or self.model
+        request_kwargs: dict[str, Any] = {
+            "model": resolved_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "temperature": 0.2,
+        }
+        if provider:
+            request_kwargs["extra_body"] = {"provider": provider}
+            logger.info(
+                "OpenRouter completion model=%s provider=%s",
+                resolved_model,
+                provider,
             )
+        else:
+            logger.info("OpenRouter completion model=%s", resolved_model)
+
+        try:
+            response = self._client.chat.completions.create(**request_kwargs)
         except Exception as exc:
             raise OpenRouterClientError(f"OpenRouter request failed: {exc}") from exc
 
         if not response.choices:
             logger.warning(
                 "OpenRouter returned no choices (model=%s): %s",
-                self.model,
+                resolved_model,
                 _response_debug_payload(response),
             )
             raise OpenRouterClientError(
-                f"OpenRouter returned no choices (model={self.model})",
+                f"OpenRouter returned no choices (model={resolved_model})",
             )
 
         choice = response.choices[0]
@@ -117,14 +149,14 @@ class OpenRouterClient:
         refusal = getattr(message, "refusal", None)
         logger.warning(
             "OpenRouter returned empty content (model=%s, finish_reason=%r, refusal=%r): %s",
-            self.model,
+            resolved_model,
             finish_reason,
             refusal,
             _response_debug_payload(response),
         )
         raise OpenRouterClientError(
             "OpenRouter returned an empty response "
-            f"(model={self.model}, finish_reason={finish_reason!r}, refusal={refusal!r})",
+            f"(model={resolved_model}, finish_reason={finish_reason!r}, refusal={refusal!r})",
         )
 
 

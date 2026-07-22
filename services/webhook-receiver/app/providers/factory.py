@@ -31,10 +31,18 @@ def format_provider_model(settings: Settings) -> str:
         return " ".join(parts)
 
     if settings.agent_provider == "openrouter":
-        return (
-            f"provider=openrouter model={settings.openrouter_model} "
-            f"base_url={settings.openrouter_base_url}"
-        )
+        parts = [
+            f"provider=openrouter model={settings.openrouter_model}",
+            f"base_url={settings.openrouter_base_url}",
+        ]
+        if settings.openrouter_confidential_model:
+            parts.append(
+                f"confidential_model={settings.openrouter_confidential_model}",
+            )
+            providers = settings.parsed_confidential_providers()
+            if providers:
+                parts.append(f"confidential_providers={','.join(providers)}")
+        return " ".join(parts)
 
     model = format_cursor_model_selection(
         settings.cursor_model,
