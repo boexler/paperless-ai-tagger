@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from app.config import Settings
+from app.correspondent_dedup import (
+    find_duplicate_correspondent,
+    merge_correspondent_match,
+)
 from app.paperless_client import PaperlessClient, PaperlessClientError
 from app.providers.openrouter.client import OpenRouterClient, OpenRouterClientError
 from app.providers.openrouter.schemas import (
@@ -378,6 +382,40 @@ class OpenRouterOrchestrator:
                 raise OpenRouterOrchestratorError(
                     "correspondent.create requires name and match",
                 )
+            duplicate = find_duplicate_correspondent(
+                decision.name,
+                context["correspondents"],
+            )
+            if duplicate is not None and "id" in duplicate:
+                duplicate_id = int(duplicate["id"])
+                merged_match = merge_correspondent_match(
+                    str(duplicate.get("match") or ""),
+                    decision.match,
+                )
+                if merged_match and merged_match != (duplicate.get("match") or ""):
+                    self.paperless.update_correspondent(
+                        duplicate_id,
+                        match=merged_match,
+                        matching_algorithm=decision.matching_algorithm or 4,
+                        is_insensitive=True,
+                    )
+                    note = (
+                        f"Korrespondent gesetzt: {duplicate.get('name')} "
+                        f"(statt neuem '{decision.name}', Regex nachgepflegt)."
+                    )
+                else:
+                    note = (
+                        f"Korrespondent gesetzt: {duplicate.get('name')} "
+                        f"(statt neuem '{decision.name}')."
+                    )
+                logger.info(
+                    "Redirected correspondent create %r to existing id=%s name=%r",
+                    decision.name,
+                    duplicate_id,
+                    duplicate.get("name"),
+                )
+                return duplicate_id, note
+
             created = self.paperless.create_correspondent(
                 name=decision.name,
                 match=decision.match,
