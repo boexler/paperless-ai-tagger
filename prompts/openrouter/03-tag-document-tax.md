@@ -129,7 +129,7 @@ Entscheidung:
     "classification_note": "kurze Begründung auf Deutsch"
   },
   "tags": {
-    "tags_to_add": ["Finanzen", "Wohnen", "ai-tag-document"],
+    "tags_to_add": ["Stromlieferant / Netzbetreiber", "ai-tag-document"],
     "new_tags": [],
     "needs_review": false,
     "review_reasons": [],

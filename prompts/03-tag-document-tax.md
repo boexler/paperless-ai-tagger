@@ -164,7 +164,7 @@ Wähle primär aus `tag_list`. Reihenfolge: exakt passend → allgemeiner passen
 
 Keine Tags, die nur den Dokumenttyp wiederholen. In Phase A **keine** Steuer-Tags (`steuerrelevant`, `ai-tag-tax`, `ai-review-tag-tax`) — Phase B übernimmt.
 
-Beispiele: Stromrechnung → `Wohnen`, `Strom`, `Finanzen`; Steuerbescheid → `Behörde`, `wichtig` (ohne steuerliche Tag-Namen).
+Beispiele: Stromrechnung / Zahlungserinnerung Versorger → `Stromlieferant / Netzbetreiber` (nicht `Finanzen`, `Wohnen`, `Finanzdienstleister` — IBAN/Überweisungsdaten machen keinen Bank-Tag); Steuerbescheid → `Behörde`, `wichtig` (ohne steuerliche Tag-Namen).
 
 ### A.10 `ai-tag-document` und `ai-review-tag-document`
 
@@ -392,7 +392,7 @@ Automatische Einordnung:
 - Korrespondent nicht geändert, plausibel (Stadtwerke).
 - Dokumenttyp nicht geändert, plausibel (Rechnung). Titel plausibel, nicht geändert.
 - Datum unverändert (stimmt mit Rechnungsdatum überein).
-- Tags ergänzt: Finanzen, Wohnen, Strom, ai-tag-document. Begründung: Stromrechnung Wohnung.
+- Tags ergänzt: Stromlieferant / Netzbetreiber, ai-tag-document. Begründung: private Stromrechnung Versorger.
 - ai-tag-document wurde gesetzt.
 - ai-review-tag-document wurde nicht gesetzt: Metadaten plausibel.
 - Keine neuen Tags angelegt.
@@ -450,7 +450,7 @@ Steuerprüfung:
 
 ### Dokumenttyp vs. Tag
 
-Dokumenttyp = Form (Rechnung, Vertrag …). Tags = Thema/Kontext/Status (Finanzen, Wohnen, todo, frist …). Begriff nicht doppelt als Tag, wenn bereits Dokumenttyp.
+Dokumenttyp = Form (Rechnung, Vertrag …). Tags = Thema/Kontext/Status (`Stromlieferant / Netzbetreiber`, Versicherung, todo, frist …). Begriff nicht doppelt als Tag, wenn bereits Dokumenttyp.
 
 ### Korrespondent vs. Tag
 
@@ -497,4 +497,4 @@ Kurz auf Deutsch:
 
 Beispiel:
 
-`Dokument {{document_id}}: Korrespondent Stadtwerke (unverändert), Typ Rechnung, Titel unverändert, Datum unverändert. Tags: Finanzen, Wohnen, Strom, ai-tag-document, ai-tag-tax. Steuer: kein klarer Bezug. ai-review-tag-document und ai-review-tag-tax nicht gesetzt.`
+`Dokument {{document_id}}: Korrespondent Stadtwerke (unverändert), Typ Rechnung, Titel unverändert, Datum unverändert. Tags: Stromlieferant / Netzbetreiber, ai-tag-document, ai-tag-tax. Steuer: kein klarer Bezug. ai-review-tag-document und ai-review-tag-tax nicht gesetzt.`
